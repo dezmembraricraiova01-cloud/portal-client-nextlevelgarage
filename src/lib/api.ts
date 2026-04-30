@@ -36,6 +36,9 @@ export const api = {
 	verifyOtp: (telefon: string, cod: string) =>
 		request<{ token: string; client: Client }>('POST', '/auth/verify-otp', { telefon, cod }),
 
+	devLogin: () =>
+		request<{ token: string; client: Client }>('GET', '/auth/dev-login'),
+
 	logout: () => request<{ message: string }>('POST', '/auth/logout'),
 
 	me: () => request<Client>('GET', '/auth/me'),

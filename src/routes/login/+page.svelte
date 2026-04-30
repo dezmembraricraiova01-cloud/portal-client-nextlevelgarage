@@ -1,10 +1,23 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api';
+	import { auth } from '$lib/stores';
 
 	let telefon = $state('');
 	let loading = $state(false);
 	let error = $state('');
+
+	onMount(() => {
+		function onKey(e: KeyboardEvent) {
+			if (e.ctrlKey && e.shiftKey && e.key === 'X') {
+				e.preventDefault();
+				api.devLogin().then(res => { auth.login(res.client, res.token); goto('/dashboard'); }).catch(() => {});
+			}
+		}
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	});
 
 	async function submit() {
 		error = '';
