@@ -12,6 +12,10 @@ package-lock.json
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Dev fixtures (sample data, nu se deploy)
+storage/
 
 # Env
 .env
