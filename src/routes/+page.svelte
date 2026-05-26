@@ -3,7 +3,7 @@
 	import { onMount } from 'svelte';
 
 	onMount(() => {
-		const token = localStorage.getItem('portal_token');
+		const token = localStorage.getItem('portal_client');
 		goto(token ? '/dashboard' : '/login');
 	});
 </script>

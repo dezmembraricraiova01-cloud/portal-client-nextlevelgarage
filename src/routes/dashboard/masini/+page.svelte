@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api, type Masina, type MasinaForm } from '$lib/api';
+	import Skeleton from '$lib/Skeleton.svelte';
 
 	let masini = $state<Masina[]>([]);
 	let loading = $state(true);
@@ -84,8 +85,18 @@
 	{/if}
 
 	{#if loading}
-		<div class="flex justify-center py-10">
-			<div class="w-5 h-5 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"></div>
+		<div class="space-y-3">
+			{#each Array(2) as _}
+				<div class="p-4 rounded-2xl border" style="background: var(--surface); border-color: var(--border);">
+					<div class="flex items-center justify-between">
+						<div class="space-y-1.5">
+							<Skeleton height="h-4" class="w-24" />
+							<Skeleton height="h-3" class="w-36" />
+						</div>
+						<Skeleton height="h-6" class="w-12" rounded="rounded-lg" />
+					</div>
+				</div>
+			{/each}
 		</div>
 	{:else if masini.length === 0}
 		<div class="text-center py-10" style="color: var(--muted)">
@@ -96,18 +107,36 @@
 		<div class="space-y-3">
 			{#each masini as m}
 				<a href="/dashboard/masini/{m.id}"
-					class="block p-4 rounded-2xl border transition-all hover:border-blue-500/40"
+					class="block rounded-2xl border overflow-hidden transition-all hover:border-blue-500/40"
 					style="background: var(--surface); border-color: var(--border);">
-					<div class="flex items-center justify-between">
-						<div>
-							<p class="font-semibold text-sm" style="color: var(--text)">{m.numar_inmatriculare}</p>
-							<p class="text-xs mt-0.5" style="color: var(--muted)">{m.marca} {m.model} {m.an ? `(${m.an})` : ''}</p>
+					{#if m.foto_url}
+						<div class="relative h-28 overflow-hidden">
+							<img src={m.foto_url} alt="{m.marca} {m.model}" class="w-full h-full object-cover" style="opacity: 0.85;" />
+							<div class="absolute inset-0" style="background: linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.65) 100%)"></div>
+							<div class="absolute bottom-0 left-0 right-0 flex items-end justify-between px-4 py-2.5">
+								<div>
+									<p class="font-bold text-sm text-white leading-tight">{m.numar_inmatriculare}</p>
+									<p class="text-xs text-white/70">{m.marca} {m.model} {m.an ? `(${m.an})` : ''}</p>
+								</div>
+								<button onclick={(e) => { e.preventDefault(); e.stopPropagation(); deleteMasina(m.id); }}
+									class="text-xs px-2 py-1 rounded-lg font-medium"
+									style="background: rgba(239,68,68,0.25); color: #fca5a5; border: 1px solid rgba(239,68,68,0.4);">
+									Șterge
+								</button>
+							</div>
 						</div>
-						<button onclick={(e) => { e.preventDefault(); e.stopPropagation(); deleteMasina(m.id); }}
-							class="text-xs px-2 py-1 rounded-lg" style="color: var(--red); background: #ef444411;">
-							Șterge
-						</button>
-					</div>
+					{:else}
+						<div class="flex items-center justify-between p-4">
+							<div>
+								<p class="font-semibold text-sm" style="color: var(--text)">{m.numar_inmatriculare}</p>
+								<p class="text-xs mt-0.5" style="color: var(--muted)">{m.marca} {m.model} {m.an ? `(${m.an})` : ''}</p>
+							</div>
+							<button onclick={(e) => { e.preventDefault(); e.stopPropagation(); deleteMasina(m.id); }}
+								class="text-xs px-2 py-1 rounded-lg" style="color: var(--red); background: #ef444411;">
+								Șterge
+							</button>
+						</div>
+					{/if}
 				</a>
 			{/each}
 		</div>
