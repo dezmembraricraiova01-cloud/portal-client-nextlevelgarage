@@ -7,10 +7,10 @@
 	import { api } from '$lib/api';
 	import { initSmooth, destroySmooth, bindReveal } from '$lib/smooth';
 	import * as PullToRefresh from 'pulltorefreshjs';
-	import 'shepherd.js/dist/css/shepherd.css';
 	import ChatPortal from '$lib/ChatPortal.svelte';
 	import ConsilierChatMini from '$lib/ConsilierChatMini.svelte';
 	import GdprConsentModal from '$lib/GdprConsentModal.svelte';
+	import HelpButton from '$lib/HelpButton.svelte';
 	import { activeWoUid, activeWorkOrders, type ActiveWorkOrder } from '$lib/stores';
 
 	let { children } = $props();
@@ -608,6 +608,9 @@
 
 	<!-- GDPR consent modal (blocant la primul login / la schimbarea politicii) -->
 	<GdprConsentModal />
+
+	<!-- Help & Tour — buton "?" floating cu pulse când tour-ul nu a fost văzut -->
+	<HelpButton />
 
 	<!-- Bottom Nav -->
 	<nav data-tour="nav" class="fixed bottom-0 left-0 right-0 z-50 border-t flex"

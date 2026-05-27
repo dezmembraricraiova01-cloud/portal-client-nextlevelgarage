@@ -1,0 +1,188 @@
+/* =============================================================================
+   Shepherd.js — Tema premium NLG Portal
+   Override complet peste shepherd.css default. Glassmorphism + gradient + animații.
+   ============================================================================= */
+
+:root {
+    --tour-bg:           rgba(13, 15, 26, 0.92);
+    --tour-bg-solid:     #0d0f1a;
+    --tour-border:       rgba(99, 102, 241, 0.35);
+    --tour-text:         #f1f5f9;
+    --tour-text-muted:   #94a3b8;
+    --tour-accent:       #3b82f6;
+    --tour-gradient:     linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+    --tour-overlay-bg:   rgba(0, 0, 0, 0.65);
+    --tour-shadow:       0 24px 64px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.shepherd-modal-overlay-container {
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+.shepherd-modal-overlay-container.shepherd-modal-is-visible path {
+    fill: var(--tour-overlay-bg);
+    opacity: 1;
+}
+
+.shepherd-element.app-tour-step {
+    background: transparent;
+    max-width: 440px;
+    z-index: 10001;
+    filter: drop-shadow(0 12px 32px rgba(0, 0, 0, 0.45));
+    animation: tourFadeIn .35s cubic-bezier(.16, 1, .3, 1);
+}
+@keyframes tourFadeIn {
+    from { opacity: 0; transform: scale(0.94) translateY(8px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.shepherd-element.app-tour-step .shepherd-content {
+    background: var(--tour-bg);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid var(--tour-border);
+    border-radius: 16px;
+    box-shadow: var(--tour-shadow);
+    overflow: hidden;
+    padding: 0;
+    position: relative;
+    color: var(--tour-text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+.shepherd-element.app-tour-step .shepherd-content::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--tour-gradient);
+    z-index: 2;
+}
+
+.shepherd-element.app-tour-step .shepherd-header {
+    background: transparent;
+    padding: 22px 24px 0;
+    border: none;
+    position: relative; z-index: 3;
+}
+.shepherd-element.app-tour-step .shepherd-title {
+    color: var(--tour-text);
+    font-size: 17px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.35;
+    margin: 0; flex: 1; padding-right: 8px;
+}
+
+.shepherd-element.app-tour-step .shepherd-cancel-icon {
+    width: 28px; height: 28px;
+    color: var(--tour-text-muted);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .18s ease;
+    opacity: 1;
+}
+.shepherd-element.app-tour-step .shepherd-cancel-icon:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.3);
+    transform: scale(1.05);
+}
+
+/* Step counter + progress (injectate runtime de tour.ts) */
+.tour-step-meta {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 24px 0;
+    position: relative; z-index: 3;
+}
+.tour-step-counter {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--tour-text-muted); white-space: nowrap;
+}
+.tour-step-counter strong { color: var(--tour-text); font-weight: 800; }
+.tour-progress {
+    flex: 1; height: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 99px; overflow: hidden;
+}
+.tour-progress-bar {
+    height: 100%;
+    background: var(--tour-gradient);
+    border-radius: 99px;
+    transition: width .4s cubic-bezier(.16, 1, .3, 1);
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
+}
+
+.shepherd-element.app-tour-step .shepherd-text {
+    padding: 14px 24px 22px;
+    color: var(--tour-text);
+    font-size: 14px; line-height: 1.6; font-weight: 400;
+    position: relative; z-index: 3;
+}
+.shepherd-element.app-tour-step .shepherd-text p { margin: 0; color: rgba(241, 245, 249, 0.88); }
+.shepherd-element.app-tour-step .shepherd-text strong { color: var(--tour-text); font-weight: 700; }
+.shepherd-element.app-tour-step .shepherd-text code {
+    background: rgba(99, 102, 241, 0.15);
+    color: #c7d2fe;
+    padding: 2px 6px; border-radius: 4px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+}
+
+.shepherd-element.app-tour-step .shepherd-footer {
+    padding: 12px 18px 18px;
+    background: transparent; border: none;
+    display: flex; gap: 8px; justify-content: flex-end;
+    position: relative; z-index: 3;
+}
+.shepherd-element.app-tour-step .shepherd-button {
+    background: var(--tour-accent);
+    color: #fff; border: none;
+    padding: 9px 16px; border-radius: 9px;
+    font-size: 13px; font-weight: 600; letter-spacing: -0.01em;
+    cursor: pointer; transition: all .18s ease;
+    margin: 0; position: relative; overflow: hidden;
+}
+.shepherd-element.app-tour-step .shepherd-button:not(:disabled):hover {
+    background: #2563eb;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+}
+.shepherd-element.app-tour-step .shepherd-button::before {
+    content: '';
+    position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left .6s ease;
+}
+.shepherd-element.app-tour-step .shepherd-button:hover::before { left: 100%; }
+
+.shepherd-element.app-tour-step .shepherd-button.shepherd-btn-secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--tour-text-muted);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.shepherd-element.app-tour-step .shepherd-button.shepherd-btn-secondary:not(:disabled):hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--tour-text);
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: none;
+}
+
+.shepherd-element.app-tour-step .shepherd-arrow { width: 16px; height: 16px; }
+.shepherd-element.app-tour-step .shepherd-arrow::before {
+    background: var(--tour-bg-solid);
+    border: 1px solid var(--tour-border);
+}
+
+@keyframes tourSpotlightPulse {
+    0%, 100% { filter: drop-shadow(0 0 0 transparent); }
+    50%      { filter: drop-shadow(0 0 24px rgba(99, 102, 241, 0.45)); }
+}
+.shepherd-modal-overlay-container.shepherd-modal-is-visible {
+    animation: tourSpotlightPulse 2.4s ease-in-out infinite;
+}
+
+@media (max-width: 640px) {
+    .shepherd-element.app-tour-step { max-width: calc(100vw - 24px); }
+    .shepherd-element.app-tour-step .shepherd-header,
+    .shepherd-element.app-tour-step .shepherd-text,
+    .tour-step-meta { padding-left: 18px; padding-right: 18px; }
+    .shepherd-element.app-tour-step .shepherd-title { font-size: 16px; }
+}
