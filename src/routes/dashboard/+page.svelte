@@ -128,7 +128,7 @@
 	<div class="content-outer space-y-4 pb-4">
 
 		<!-- HERO ZONE — full bleed -->
-		<div class="hero-zone -mx-6 pt-2 pb-3" style="background: linear-gradient(180deg, #0d0d22 0%, #131328 55%, transparent 100%)">
+		<div data-tour="masina" class="hero-zone -mx-6 pt-2 pb-3" style="background: linear-gradient(180deg, #0d0d22 0%, #131328 55%, transparent 100%)">
 
 			<!-- ① Salut -->
 			<div class="px-4 pb-2">
@@ -316,7 +316,7 @@
 			<!-- ③ Acțiunea principală — eliminata (redundant cu hero status) -->
 
 		<!-- ④ CTA închiriere — buton "Ce mașină vrei să închiriezi?" -->
-		<a href="/dashboard/inchirieri" data-reveal data-delay="0.1"
+		<a href="/dashboard/inchirieri" data-tour="inchirieri" data-reveal data-delay="0.1"
 			class="rental-cta group relative block rounded-2xl overflow-hidden transition-all active:scale-[0.985]">
 			<div class="rental-aurora absolute inset-0 pointer-events-none"></div>
 			<div class="rental-shimmer absolute inset-0 pointer-events-none"></div>
