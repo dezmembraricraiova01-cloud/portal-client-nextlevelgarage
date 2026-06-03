@@ -27,6 +27,12 @@
 
 	const telefonValid = $derived(/^07\d{8}$/.test(telefon));
 
+	// URL de revenire (ex: piesata.test/catalog) — doar http(s), evităm javascript: & co.
+	const returnUrl = $derived.by(() => {
+		const r = page.url.searchParams.get('return') ?? '';
+		return /^https?:\/\//i.test(r) ? r : '';
+	});
+
 	// Pulse pe buton când numărul devine valid
 	$effect(() => {
 		if (telefonValid && submitBtn) {
@@ -157,6 +163,16 @@
 </script>
 
 <div class="min-h-screen flex flex-col items-center justify-center px-4 py-10">
+
+	<!-- Buton revenire în site (apare doar cu ?return=...) -->
+	{#if returnUrl}
+		<a href={returnUrl}
+			class="fixed top-4 left-4 z-20 flex items-center gap-1.5 pl-2.5 pr-4 py-2 rounded-full text-xs font-semibold transition-all hover:gap-2.5 active:scale-95"
+			style="background: rgba(11,13,22,0.72); border: 1px solid rgba(255,255,255,0.12); backdrop-filter: blur(12px); color: rgba(255,255,255,0.82); text-decoration: none; box-shadow: 0 6px 20px rgba(0,0,0,0.4);">
+			<span class="text-lg leading-none" style="margin-top:-1px">‹</span>
+			Înapoi în site
+		</a>
+	{/if}
 
 	<!-- Titlu split-text -->
 	<div class="mb-8 text-center" style="perspective: 600px">
