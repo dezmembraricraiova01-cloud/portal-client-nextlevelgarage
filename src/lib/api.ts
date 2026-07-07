@@ -49,8 +49,17 @@ export const api = {
 			'POST', '/public/cerere-schimbare-telefon',
 			{ telefon_curent: telefonCurent, telefon_contact: telefonContact }
 		),
-	devLogin: () =>
-		request<{ client: Client }>('GET', '/api/auth/dev'),
+	devLogin: async (devKey: string): Promise<{ client: Client }> => {
+		const res = await fetch('/api/auth/dev', {
+			method: 'GET',
+			headers: { Accept: 'application/json', 'X-Dev-Key': devKey }
+		});
+		if (!res.ok) {
+			const err = await res.json().catch(() => ({ message: 'Bypass indisponibil.' }));
+			throw { status: res.status, message: err.message ?? 'Bypass indisponibil.', ...err };
+		}
+		return res.json();
+	},
 	logout: () =>
 		request<{ message: string }>('POST', '/api/auth/logout'),
 	me: () => priv<Client>('GET', '/auth/me'),

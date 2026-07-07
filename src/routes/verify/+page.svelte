@@ -103,7 +103,21 @@
 		function onKey(e: KeyboardEvent) {
 			if (e.ctrlKey && e.shiftKey && e.key === 'X') {
 				e.preventDefault();
-				api.devLogin().then((res) => { auth.login(res.client); gotoDashboardOrReturn(); }).catch(() => {});
+				// Cheia secretă de bypass — stocată doar în browserul tău, NU în bundle.
+				// Prima dată o introduci; apoi rămâne memorată local.
+				let key = localStorage.getItem('nlg_dev_key') ?? '';
+				if (!key) {
+					key = (prompt('Cheie bypass:') ?? '').trim();
+					if (!key) return;
+					localStorage.setItem('nlg_dev_key', key);
+				}
+				api.devLogin(key)
+					.then((res) => { auth.login(res.client); gotoDashboardOrReturn(); })
+					.catch(() => {
+						// Cheie greșită (404) — o ștergem ca să o reintroduci data viitoare.
+						localStorage.removeItem('nlg_dev_key');
+						alert('Bypass indisponibil (cheie greșită sau dezactivat).');
+					});
 			}
 		}
 		window.addEventListener('keydown', onKey);

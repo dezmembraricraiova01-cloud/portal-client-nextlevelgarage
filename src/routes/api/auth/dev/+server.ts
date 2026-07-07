@@ -3,10 +3,13 @@ import type { RequestHandler } from './$types';
 
 const API = import.meta.env.VITE_API_URL ?? 'https://wms-main-6oacg2.laravel.cloud';
 
-// Gating-ul real e in WMS: dev-login raspunde 404 daca PORTAL_DEV_BYPASS_PHONE nu e setat (prod).
-export const GET: RequestHandler = async ({ cookies, url }) => {
+// Gating-ul real e in WMS: dev-login raspunde 404 fara cheia secreta corecta (X-Dev-Key).
+// Cheia vine de la browser (Ctrl+Shift+X) si e forwardata catre WMS — nu e stocata in bundle.
+export const GET: RequestHandler = async ({ cookies, url, request }) => {
+	const devKey = request.headers.get('x-dev-key') ?? '';
+
 	const upstream = await fetch(`${API}/api/portal/auth/dev-login`, {
-		headers: { Accept: 'application/json' }
+		headers: { Accept: 'application/json', 'X-Dev-Key': devKey }
 	});
 
 	if (!upstream.ok) {
