@@ -161,6 +161,41 @@
 				{/if}
 			{/snippet}
 
+			{#snippet showroomBg()}
+				<!-- Fundal showroom: reflector + dâre de lumină + siluetă mașină (fallback fără poză) -->
+				<div class="sh-bg absolute inset-0"></div>
+				<div class="sh-spot absolute inset-0 pointer-events-none"></div>
+				<div class="sh-streaks absolute inset-0 pointer-events-none"></div>
+				<div class="sh-floor absolute inset-x-0 bottom-0 pointer-events-none"></div>
+				<svg class="sh-car" viewBox="0 0 640 240" aria-hidden="true">
+					<defs>
+						<linearGradient id="shCarGrad" x1="0" y1="0" x2="0" y2="1">
+							<stop offset="0" stop-color="#33407a" />
+							<stop offset="1" stop-color="#141a38" />
+						</linearGradient>
+					</defs>
+					<path class="body" d="M28 176 C 78 176 96 172 128 156 C 168 128 214 112 300 110 C 372 109 420 120 452 140 C 470 151 486 156 512 158 L 566 162 C 596 165 612 172 612 182 L 612 190 C 612 196 607 200 600 200 L 40 200 C 32 200 26 194 26 186 Z" />
+					<path class="glass" d="M150 150 C 182 124 222 112 292 111 C 336 111 366 118 388 130 L 372 150 Z" />
+					<path class="glass" d="M300 111 C 356 112 398 121 430 138 L 452 150 L 320 150 Z" opacity=".7" />
+					<circle class="glow" cx="596" cy="176" r="6" opacity=".9" />
+					<circle class="wheel" cx="180" cy="196" r="30" />
+					<circle class="hub" cx="180" cy="196" r="11" />
+					<circle class="wheel" cx="486" cy="196" r="30" />
+					<circle class="hub" cx="486" cy="196" r="11" />
+				</svg>
+			{/snippet}
+
+			{#snippet photoFrame(masinaId: number)}
+				<!-- Chenarul e chiar butonul de upload — duce la fișa mașinii unde se adaugă pozele -->
+				<a href="/dashboard/masini/{masinaId}" class="sh-frame" aria-label="Adaugă o poză cu mașina ta">
+					<span class="sh-corner sh-c1"></span><span class="sh-corner sh-c2"></span>
+					<span class="sh-corner sh-c3"></span><span class="sh-corner sh-c4"></span>
+					<span class="sh-cam">📷</span>
+					<span class="sh-lbl">Adaugă o poză</span>
+					<span class="sh-sub">apasă aici</span>
+				</a>
+			{/snippet}
+
 			<!-- ② Banner mașină activă -->
 			{#if data.masina_activa}
 				{@const m = data.masina_activa}
@@ -211,28 +246,45 @@
 						</div>
 					</div>
 				{:else}
-					<!-- Banner text (fără poză) -->
-					<div class="mx-4 px-4 py-3.5 rounded-2xl border" style="background: {cs.bg}; border-color: {cs.border};">
-						<p class="text-xs font-medium mb-1" style="color: var(--muted)">Mașina ta este în service</p>
-						<p class="font-bold text-base leading-tight" style="color: var(--text)">{m.marca} {m.model}{m.an ? ` (${m.an})` : ''}</p>
-						<p class="text-sm font-mono mt-0.5 mb-2" style="color: var(--muted)">{m.numar_inmatriculare}</p>
-						<div class="flex flex-wrap items-center gap-2">
-							<span class="text-sm font-semibold" style="color: {cs.text}">{m.status_label}</span>
-							{#if m.ultima_actualizare}
-								<span class="text-xs" style="color: var(--muted)">· {formatActualizare(m.ultima_actualizare)}</span>
-							{/if}
+					<!-- Banner showroom (fără poză) — chenarul e butonul de adăugat poză -->
+					<div class="relative overflow-hidden hero-banner" style="height: 240px; border-top: 2px solid {cs.text}; --ac: {cs.text};">
+						{@render showroomBg()}
+
+						<div class="absolute left-0 right-0 top-0 px-5 pt-4 z-10">
+							<p class="text-xs font-medium mb-1" style="color: var(--muted)">Mașina ta este în service</p>
+							<p class="font-bold text-xl leading-tight" style="color: var(--text)">{m.marca} {m.model}{m.an ? ` (${m.an})` : ''}</p>
+							<p class="text-sm font-mono mt-0.5" style="color: var(--muted)">{m.numar_inmatriculare}</p>
 						</div>
-						{#if m.eta}
-							<p class="text-xs mt-1" style="color: var(--muted)">
-								⏱ Estimat gata: <span style="color: var(--text); font-weight: 600">{new Date(m.eta).toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-							</p>
-						{/if}
-						{#if m.deviz_pending}
-							<a href="/dashboard/reparatii/{m.wo_uid}/deviz" class="inline-block mt-2 text-xs px-2 py-0.5 rounded-full font-semibold transition-opacity active:opacity-70" style="background: #eab30820; color: #eab308; border: 1px solid #eab30840; text-decoration: none;">
-								⚠️ Deviz în așteptare →
-							</a>
-						{/if}
-						<div class="mt-2">{@render programareChip(false)}</div>
+
+						{@render photoFrame(m.masina_id)}
+
+						<div class="hero-dock absolute left-0 right-0 bottom-0 z-10">
+							<div class="hero-dock-aurora absolute inset-0 pointer-events-none"></div>
+							<div class="relative px-4 py-3 flex items-center gap-3">
+								<div class="flex-1 min-w-0">
+									<div class="flex items-center gap-1.5 flex-wrap">
+										<span class="hero-status-dot" style="background: {cs.text}"></span>
+										<span class="text-sm font-bold leading-none" style="color: {cs.text}">{m.status_label}</span>
+										{#if m.ultima_actualizare}
+											<span class="text-[11px] leading-none" style="color: var(--muted)">· {formatActualizare(m.ultima_actualizare)}</span>
+										{/if}
+									</div>
+									{#if m.eta}
+										<p class="text-[11px] mt-1" style="color: var(--muted)">
+											⏱ Gata: <span style="color: var(--text); font-weight: 600">{new Date(m.eta).toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+										</p>
+									{/if}
+									{#if m.deviz_pending}
+										<a href="/dashboard/reparatii/{m.wo_uid}/deviz" class="inline-block mt-1.5 text-[11px] px-2 py-0.5 rounded-full font-semibold transition-opacity active:opacity-70" style="background: #eab30828; color: #eab308; border: 1px solid #eab30850; text-decoration: none;">
+											⚠️ Deviz în așteptare →
+										</a>
+									{/if}
+								</div>
+								<div class="shrink-0">
+									{@render programareChip(true)}
+								</div>
+							</div>
+						</div>
 					</div>
 				{/if}
 
@@ -286,17 +338,30 @@
 						</div>
 					</div>
 				{:else}
-					<div class="mx-4 px-4 py-3.5 rounded-2xl border" style="background: var(--surface); border-color: var(--border);">
-						<p class="text-xs font-medium mb-1" style="color: var(--muted)">Mașina ta</p>
-						<p class="font-bold text-base leading-tight" style="color: var(--text)">{mp.marca} {mp.model}{mp.an ? ` (${mp.an})` : ''}</p>
-						<p class="text-sm font-mono mt-0.5 mb-2" style="color: var(--muted)">{mp.numar_inmatriculare}</p>
-						<div class="flex flex-wrap items-center gap-2">
-							<span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
-								style="background: #22c55e18; color: #22c55e; border: 1px solid #22c55e40;">
-								<span style="width: 6px; height: 6px; border-radius: 50%; background: #22c55e; display: inline-block;"></span>
-								În regulă · niciun service activ
-							</span>
-							{@render programareChip(false)}
+					<!-- Banner showroom (fără poză) — chenarul e butonul de adăugat poză -->
+					<div class="relative overflow-hidden hero-banner" style="height: 240px; border-top: 2px solid #22c55e; --ac: #22c55e;">
+						{@render showroomBg()}
+
+						<div class="absolute left-0 right-0 top-0 px-5 pt-4 z-10">
+							<p class="text-xs font-medium mb-1" style="color: var(--muted)">Mașina ta</p>
+							<p class="font-bold text-xl leading-tight" style="color: var(--text)">{mp.marca} {mp.model}{mp.an ? ` (${mp.an})` : ''}</p>
+							<p class="text-sm font-mono mt-0.5" style="color: var(--muted)">{mp.numar_inmatriculare}</p>
+						</div>
+
+						{@render photoFrame(mp.masina_id)}
+
+						<div class="hero-dock absolute left-0 right-0 bottom-0 z-10">
+							<div class="hero-dock-aurora absolute inset-0 pointer-events-none"></div>
+							<div class="relative px-4 py-3 flex items-center gap-3">
+								<div class="flex-1 min-w-0 flex items-center gap-1.5">
+									<span class="hero-status-dot" style="background: #22c55e"></span>
+									<span class="text-sm font-bold leading-none" style="color: #22c55e">În regulă</span>
+									<span class="text-[11px] leading-none" style="color: var(--muted)">· niciun service activ</span>
+								</div>
+								<div class="shrink-0">
+									{@render programareChip(true)}
+								</div>
+							</div>
 						</div>
 					</div>
 				{/if}
@@ -577,6 +642,83 @@
 
 	@media (prefers-reduced-motion: reduce) {
 		.hero-dock-aurora, .hero-status-dot, .hero-pill--cta, .hero-pill-shimmer { animation: none; }
+	}
+
+	/* ===== Showroom — hero fallback fără poză ===== */
+	.sh-bg {
+		background: radial-gradient(120% 95% at 50% 30%, #1b2350 0%, #131328 46%, #0d0d22 100%);
+	}
+	.sh-spot {
+		background:
+			radial-gradient(46% 40% at 50% 46%, rgba(59,130,246,0.34), transparent 72%),
+			radial-gradient(40% 30% at 18% 6%, rgba(120,160,255,0.12), transparent 70%);
+		animation: shSpot 7s ease-in-out infinite alternate;
+	}
+	@keyframes shSpot { from { opacity: 0.82; } to { opacity: 1; } }
+	.sh-streaks {
+		opacity: 0.45;
+		background:
+			linear-gradient(105deg, transparent 44%, rgba(255,255,255,0.06) 48%, transparent 52%),
+			linear-gradient(105deg, transparent 62%, rgba(120,160,255,0.10) 66%, transparent 70%);
+	}
+	.sh-floor {
+		height: 48%;
+		background: linear-gradient(180deg, transparent, rgba(6,7,20,0.88));
+	}
+	.sh-car {
+		position: absolute;
+		z-index: 0;
+		right: -4px;
+		bottom: 30px;
+		width: 92%;
+		opacity: 0.32;
+		filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+		animation: shDrift 9s ease-in-out infinite alternate;
+	}
+	@keyframes shDrift { from { transform: translateX(0); } to { transform: translateX(-2.5%); } }
+	.sh-car .body  { fill: url(#shCarGrad); }
+	.sh-car .glass { fill: rgba(150,180,255,0.18); }
+	.sh-car .wheel { fill: #0b0b18; stroke: rgba(150,180,255,0.30); stroke-width: 3; }
+	.sh-car .hub   { fill: rgba(150,180,255,0.28); }
+	.sh-car .glow  { fill: #8fb4ff; }
+
+	.sh-frame {
+		position: absolute;
+		z-index: 5;
+		left: 50%;
+		top: 51%;
+		transform: translate(-50%, -50%);
+		width: 170px;
+		height: 106px;
+		border-radius: 15px;
+		border: 1.5px dashed rgba(150,180,255,0.5);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		background: rgba(59,130,246,0.08);
+		text-decoration: none;
+		transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+	}
+	.sh-frame:hover {
+		background: rgba(59,130,246,0.15);
+		border-color: rgba(150,180,255,0.85);
+		box-shadow: 0 0 0 4px rgba(59,130,246,0.10);
+	}
+	.sh-frame:active { transform: translate(-50%, -50%) scale(0.97); }
+	.sh-frame:focus-visible { outline: 2px solid #93c5fd; outline-offset: 3px; }
+	.sh-cam { font-size: 25px; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.45)); }
+	.sh-lbl { font-size: 12.5px; font-weight: 800; color: #c3d1f2; letter-spacing: 0.01em; }
+	.sh-sub { font-size: 10.5px; font-weight: 500; color: #8fa0c8; margin-top: -3px; }
+	.sh-corner { position: absolute; width: 15px; height: 15px; border: 2px solid rgba(150,180,255,0.85); }
+	.sh-c1 { top: -1px; left: -1px;  border-right: 0; border-bottom: 0; border-radius: 5px 0 0 0; }
+	.sh-c2 { top: -1px; right: -1px; border-left: 0;  border-bottom: 0; border-radius: 0 5px 0 0; }
+	.sh-c3 { bottom: -1px; left: -1px;  border-right: 0; border-top: 0; border-radius: 0 0 0 5px; }
+	.sh-c4 { bottom: -1px; right: -1px; border-left: 0;  border-top: 0; border-radius: 0 0 5px 0; }
+
+	@media (prefers-reduced-motion: reduce) {
+		.sh-car, .sh-spot { animation: none; }
 	}
 
 	/* Rental CTA card — distinct gradient (teal/violet) ca să nu se confunde cu acțiunea principală */
