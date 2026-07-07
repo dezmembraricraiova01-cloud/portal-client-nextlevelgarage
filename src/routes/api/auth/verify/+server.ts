@@ -2,10 +2,17 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 const API = import.meta.env.VITE_API_URL ?? 'https://wms-main-6oacg2.laravel.cloud';
-const IS_PROD = import.meta.env.PROD;
 
-export const POST: RequestHandler = async ({ request, cookies }) => {
+export const POST: RequestHandler = async ({ request, cookies, url }) => {
 	const body = await request.json();
+
+	// Domeniul cookie-ului se derivă din host-ul REAL, nu dintr-un flag de build.
+	// Pe *.pages.dev (ex. portal-client-nextlevelgarage.pages.dev) un cookie cu
+	// domain='.nextlevelgarage.com' e respins de browser → token pierdut → bounce la login.
+	// Setăm domain='.nextlevelgarage.com' (pentru SSO cross-subdomain) DOAR când
+	// chiar servim de pe acel domeniu; altfel cookie host-only (pages.dev / .test).
+	const onNlgDomain = url.hostname.endsWith('nextlevelgarage.com');
+	const isHttps = url.protocol === 'https:';
 
 	const upstream = await fetch(`${API}/api/portal/auth/verify-otp`, {
 		method: 'POST',
@@ -27,10 +34,10 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	// In prod ramane '.nextlevelgarage.com' pentru SSO cross-subdomain.
 	cookies.set('portal_token', data.token, {
 		httpOnly: true,
-		secure: IS_PROD,
+		secure: isHttps,
 		sameSite: 'lax',
 		path: '/',
-		...(IS_PROD ? { domain: '.nextlevelgarage.com' } : {}),
+		...(onNlgDomain ? { domain: '.nextlevelgarage.com' } : {}),
 		maxAge: 60 * 60 * 24 * 7
 	});
 
