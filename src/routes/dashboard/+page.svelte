@@ -374,6 +374,46 @@
 						<span style="color: var(--muted)">→</span>
 					</a>
 				</div>
+			{:else}
+				<!-- Nicio mașină încă — showroom cu invitație de adăugare -->
+				<div class="relative overflow-hidden hero-banner" style="height: 240px; border-top: 2px solid var(--accent); --ac: #3b82f6;">
+					{@render showroomBg()}
+
+					<div class="absolute left-0 right-0 top-0 px-5 pt-4 z-10">
+						<p class="text-xs font-medium mb-1" style="color: var(--muted)">Garajul tău</p>
+						<p class="font-bold text-xl leading-tight" style="color: var(--text)">Nicio mașină încă</p>
+						<p class="text-sm mt-0.5" style="color: var(--muted)">Adaug-o și vezi tot într-un singur loc</p>
+					</div>
+
+					<a href="/dashboard/masini" class="sh-frame" aria-label="Adaugă mașina ta">
+						<span class="sh-corner sh-c1"></span><span class="sh-corner sh-c2"></span>
+						<span class="sh-corner sh-c3"></span><span class="sh-corner sh-c4"></span>
+						<span class="sh-cam">🚗</span>
+						<span class="sh-lbl">Adaugă mașina ta</span>
+						<span class="sh-sub">apasă aici</span>
+					</a>
+
+					<div class="hero-dock absolute left-0 right-0 bottom-0 z-10">
+						<div class="hero-dock-aurora absolute inset-0 pointer-events-none"></div>
+						<div class="relative px-4 py-3 flex items-center gap-3">
+							<div class="flex-1 min-w-0">
+								<span class="text-[11px] leading-none" style="color: var(--muted)">Reparații, programări și alerte — toate legate de mașina ta.</span>
+							</div>
+							<div class="shrink-0">
+								{@render programareChip(true)}
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="px-4 pt-4">
+					<a href="/dashboard/masini"
+						class="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98]"
+						style="background: var(--accent); color: #fff; border: 1px solid transparent;">
+						<span>➕ Adaugă prima mașină</span>
+						<span>→</span>
+					</a>
+				</div>
 			{/if}
 
 		</div><!-- /hero-zone -->
