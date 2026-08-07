@@ -5,6 +5,7 @@
 	import { gsap } from 'gsap';
 	import { api } from '$lib/api';
 	import { auth } from '$lib/stores';
+	import { safeReturnUrl, needsHandoff, rememberSiteOrigin } from '$lib/sso';
 
 	let telefon = $state('');
 	let loading = $state(false);
@@ -44,6 +45,22 @@
 	});
 
 	onMount(() => {
+		// Sesiune deja activă? Nu mai cerem OTP — mergem direct la destinație.
+		// Cu ?return= spre un domeniu handoff (piesa365.ro), sso-redirect duce
+		// loginul și acolo; fără return, aterizăm în dashboard.
+		api.me().then((me) => {
+			auth.login(me);
+			const safe = safeReturnUrl(page.url.searchParams.get('return'));
+			if (safe) {
+				rememberSiteOrigin(safe);
+				window.location.href = needsHandoff(safe)
+					? '/api/auth/sso-redirect?to=' + encodeURIComponent(safe)
+					: safe;
+			} else {
+				goto('/dashboard');
+			}
+		}).catch(() => { /* nelogat — rămâne pe login */ });
+
 		const touch = window.matchMedia('(pointer: coarse)').matches;
 		const bg    = document.querySelector<HTMLElement>('.auth-bg');
 

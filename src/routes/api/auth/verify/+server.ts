@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { COOKIE_MAX_AGE } from '$lib/sso';
 
 const API = import.meta.env.VITE_API_URL ?? 'https://wms-main-6oacg2.laravel.cloud';
 
@@ -38,7 +39,7 @@ export const POST: RequestHandler = async ({ request, cookies, url }) => {
 		sameSite: 'lax',
 		path: '/',
 		...(onNlgDomain ? { domain: '.nextlevelgarage.com' } : {}),
-		maxAge: 60 * 60 * 24 * 7
+		maxAge: COOKIE_MAX_AGE
 	});
 
 	// Extragem datele complete ale clientului — verifyOtp returnează doar {id, nume, telefon, email}
