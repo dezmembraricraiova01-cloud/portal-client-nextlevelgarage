@@ -2,9 +2,8 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 const API = import.meta.env.VITE_API_URL ?? 'https://wms-main-6oacg2.laravel.cloud';
-const IS_PROD = import.meta.env.PROD;
 
-export const POST: RequestHandler = async ({ cookies, locals }) => {
+export const POST: RequestHandler = async ({ cookies, locals, url }) => {
 	const token = locals.portalToken;
 
 	if (token) {
@@ -15,11 +14,14 @@ export const POST: RequestHandler = async ({ cookies, locals }) => {
 		}).catch(() => {});
 	}
 
-	// Sterge cookie cu acelasi domain pe care a fost setat.
-	// In dev nu folosim domain (Chrome respinge '.test' ca public suffix).
+	// Sterge cookie cu ACELASI domain pe care a fost setat (aceeasi deriva ca la
+	// login: domain partajat doar pe nextlevelgarage.com; pe pages.dev/.test e
+	// host-only). Vechiul `IS_PROD → .nextlevelgarage.com` nu stergea nimic pe
+	// pages.dev — domain gresit = cookie ramas in browser.
+	const onNlgDomain = url.hostname.endsWith('nextlevelgarage.com');
 	cookies.delete('portal_token', {
 		path: '/',
-		...(IS_PROD ? { domain: '.nextlevelgarage.com' } : {})
+		...(onNlgDomain ? { domain: '.nextlevelgarage.com' } : {})
 	});
 
 	return json({ message: 'Deconectat.' });

@@ -6,6 +6,7 @@
 	import { auth } from '$lib/stores';
 	import { api } from '$lib/api';
 	import { initSmooth, destroySmooth, bindReveal } from '$lib/smooth';
+	import { siteExitHref } from '$lib/sso';
 	import * as PullToRefresh from 'pulltorefreshjs';
 	import ChatPortal from '$lib/ChatPortal.svelte';
 	import ConsilierChatMini from '$lib/ConsilierChatMini.svelte';
@@ -212,7 +213,16 @@
 	<!-- Header -->
 	<header class="sticky top-0 z-50 flex items-center justify-between px-5 h-14 border-b"
 		style="background: var(--surface); border-color: var(--border);">
-		<span class="font-bold text-base tracking-tight" style="color: var(--text)">NLG Portal</span>
+		<div class="flex items-center gap-2.5 min-w-0">
+			<span class="font-bold text-base tracking-tight whitespace-nowrap" style="color: var(--text)">NLG Portal</span>
+			<!-- Ieșire spre site — trece prin sso-redirect ca să ducă sesiunea cu ea -->
+			<a href={siteExitHref()} data-sveltekit-reload
+				class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-opacity active:opacity-70"
+				style="background: var(--surface2); color: var(--muted); border: 1px solid var(--border); text-decoration: none;">
+				<span class="text-sm leading-none" style="margin-top:-1px">‹</span>
+				Înapoi în site
+			</a>
+		</div>
 		{#if client}
 			<div class="flex items-stretch gap-2 h-10">
 				{#if client.vip}

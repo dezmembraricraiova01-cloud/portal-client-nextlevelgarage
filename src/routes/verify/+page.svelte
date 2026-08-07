@@ -5,43 +5,22 @@
 	import { gsap } from 'gsap';
 	import { api } from '$lib/api';
 	import { auth } from '$lib/stores';
+	import { safeReturnUrl, needsHandoff, rememberSiteOrigin } from '$lib/sso';
 
 	const telefon    = $derived(page.url.searchParams.get('t') ?? '');
 	const isAuto     = $derived(page.url.searchParams.get('auto') === '1');
 	const prenume    = $derived((page.url.searchParams.get('n') ?? '').trim());
 	const returnUrl  = $derived(page.url.searchParams.get('return') ?? '');
 
-	// Allowlist domenii pentru redirect dupa verify (SSO cross-subdomain)
-	// Acopera toate cele 4 site-uri din ecosistem: piesata, web nextlevelgarage, portal client, wms.
-	const ALLOWED_RETURN_PREFIXES = [
-		// Local dev (Laragon vhosts)
-		'http://piesata.test',
-		'http://nlg-portal.test',
-		'http://web_nextlevelgarage.test',
-		'http://web.nextlevelgarage.test',
-		'http://wms.test',
-		// Productie
-		'https://piesata.nextlevelgarage.com',
-		'https://nlg-portal.nextlevelgarage.com',
-		'https://client.nextlevelgarage.com',
-		'https://nextlevelgarage.com',
-		'https://www.nextlevelgarage.com'
-	];
-
-	function safeReturnUrl(url: string): string | null {
-		if (!url) return null;
-		try {
-			const decoded = decodeURIComponent(url);
-			return ALLOWED_RETURN_PREFIXES.some(p => decoded.startsWith(p)) ? decoded : null;
-		} catch {
-			return null;
-		}
-	}
-
 	function gotoDashboardOrReturn() {
 		const safe = safeReturnUrl(returnUrl);
 		if (safe) {
-			window.location.href = safe; // full reload — cookie portal_token vizibil pe destinatie
+			rememberSiteOrigin(safe); // butonul „Înapoi în site" din dashboard ține minte originea
+			// Domeniile care nu văd cookie-ul portalului (piesa365.ro) primesc
+			// handoff cu cod one-time prin sso-redirect; restul, full reload direct.
+			window.location.href = needsHandoff(safe)
+				? '/api/auth/sso-redirect?to=' + encodeURIComponent(safe)
+				: safe;
 		} else {
 			goto('/dashboard');
 		}
