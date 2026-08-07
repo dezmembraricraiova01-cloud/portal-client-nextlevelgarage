@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { api, type Masina, type MasinaForm } from '$lib/api';
+	import { api, type Masina, type MasinaForm, type MarcaAuto, type ModelAuto } from '$lib/api';
 	import Skeleton from '$lib/Skeleton.svelte';
 
 	let masini = $state<Masina[]>([]);
@@ -11,19 +11,68 @@
 
 	let form = $state<MasinaForm>({ numar_inmatriculare: '', marca: '', model: '' });
 
+	// Marcă/Model din nomenclatorul WMS, cu fallback manual „+ Alta"
+	let marci       = $state<MarcaAuto[]>([]);
+	let marcaId     = $state<number | null>(null);
+	let marcaManual = $state(false);
+	let marcaText   = $state('');
+
+	let modele        = $state<ModelAuto[]>([]);
+	let modelId       = $state<number | null>(null);
+	let modelManual   = $state(false);
+	let modelText     = $state('');
+	let loadingModele = $state(false);
+
+	const marcaFinala = $derived(
+		marcaManual ? marcaText.trim() : (marci.find(m => m.id === marcaId)?.nume ?? '')
+	);
+	const modelFinal = $derived(
+		modelManual ? modelText.trim() : (modele.find(m => m.id === modelId)?.denumire ?? '')
+	);
+
 	onMount(async () => {
 		masini = await api.masini();
 		loading = false;
 	});
 
+	function toggleForm() {
+		showForm = !showForm;
+		if (showForm && marci.length === 0) {
+			api.marci().then(m => { marci = m; }).catch(() => {});
+		}
+	}
+
+	$effect(() => {
+		if (marcaId && !marcaManual) {
+			modele = []; modelId = null; loadingModele = true;
+			api.modele(marcaId)
+				.then(m => { modele = m; })
+				.catch(() => {})
+				.finally(() => { loadingModele = false; });
+		}
+	});
+
+	function toggleMarcaManual() {
+		marcaManual = !marcaManual; marcaText = ''; marcaId = null;
+		modele = []; modelId = null; modelManual = false; modelText = '';
+	}
+
+	function toggleModelManual() {
+		modelManual = !modelManual; modelText = ''; modelId = null;
+	}
+
 	async function addMasina() {
 		error = '';
+		if (!marcaFinala) { error = 'Selectează marca.'; return; }
+		if (!modelFinal)  { error = 'Selectează modelul.'; return; }
 		saving = true;
 		try {
-			const m = await api.addMasina(form);
+			const m = await api.addMasina({ ...form, marca: marcaFinala, model: modelFinal });
 			masini = [m, ...masini];
 			showForm = false;
 			form = { numar_inmatriculare: '', marca: '', model: '' };
+			marcaId = null; marcaManual = false; marcaText = '';
+			modele = []; modelId = null; modelManual = false; modelText = '';
 		} catch (e: any) { error = e.message; }
 		finally { saving = false; }
 	}
@@ -40,7 +89,7 @@
 <div class="space-y-6">
 	<div class="flex items-center justify-between">
 		<h1 class="text-xl font-bold" style="color: var(--text)">Mașinile mele</h1>
-		<button onclick={() => showForm = !showForm}
+		<button onclick={toggleForm}
 			class="text-sm px-4 py-2 rounded-xl font-semibold"
 			style="background: var(--accent); color: white;">
 			+ Adaugă
@@ -50,10 +99,78 @@
 	{#if showForm}
 		<div class="p-4 rounded-2xl border space-y-3" style="background: var(--surface); border-color: var(--border);">
 			<h2 class="font-semibold text-sm" style="color: var(--text)">Mașină nouă</h2>
+			<div>
+				<label class="text-xs mb-1 block" style="color: var(--muted)">Nr. înmatriculare *</label>
+				<input type="text" bind:value={form.numar_inmatriculare}
+					class="w-full px-3 py-2 rounded-xl text-sm outline-none"
+					style="background: var(--surface2); border: 1px solid var(--border); color: var(--text);" />
+			</div>
+
+			<!-- Marcă — dropdown din nomenclatorul WMS, cu fallback manual -->
+			<div>
+				<label class="text-xs mb-1 block" style="color: var(--muted)">Marcă *</label>
+				<div class="flex gap-2">
+					{#if marcaManual}
+						<input type="text" bind:value={marcaText} placeholder="Ex: Dacia, BMW..."
+							class="flex-1 px-3 py-2 rounded-xl text-sm outline-none"
+							style="background: var(--surface2); border: 1px solid var(--accent); color: var(--text);" />
+						<button type="button" onclick={toggleMarcaManual}
+							class="px-3 py-2 rounded-xl text-xs font-semibold"
+							style="background: var(--surface2); color: var(--muted); border: 1px solid var(--border);">
+							Listă
+						</button>
+					{:else}
+						<select bind:value={marcaId}
+							class="flex-1 px-3 py-2 rounded-xl text-sm outline-none"
+							style="background: var(--surface2); border: 1px solid var(--border); color: {marcaId ? 'var(--text)' : 'var(--muted)'};">
+							<option value={null} disabled selected>Selectează marca</option>
+							{#each marci as m}
+								<option value={m.id}>{m.nume}</option>
+							{/each}
+						</select>
+						<button type="button" onclick={toggleMarcaManual}
+							class="px-3 py-2 rounded-xl text-xs font-semibold"
+							style="background: var(--surface2); color: var(--muted); border: 1px solid var(--border);">
+							+ Alta
+						</button>
+					{/if}
+				</div>
+			</div>
+
+			<!-- Model — dependent de marca aleasă -->
+			<div>
+				<label class="text-xs mb-1 block" style="color: var(--muted)">Model *</label>
+				<div class="flex gap-2">
+					{#if modelManual}
+						<input type="text" bind:value={modelText} placeholder="Ex: Logan, Seria 3..."
+							class="flex-1 px-3 py-2 rounded-xl text-sm outline-none"
+							style="background: var(--surface2); border: 1px solid var(--accent); color: var(--text);" />
+						<button type="button" onclick={toggleModelManual}
+							class="px-3 py-2 rounded-xl text-xs font-semibold"
+							style="background: var(--surface2); color: var(--muted); border: 1px solid var(--border);">
+							Listă
+						</button>
+					{:else}
+						<select bind:value={modelId} disabled={!marcaId && !marcaManual}
+							class="flex-1 px-3 py-2 rounded-xl text-sm outline-none disabled:opacity-40"
+							style="background: var(--surface2); border: 1px solid var(--border); color: {modelId ? 'var(--text)' : 'var(--muted)'};">
+							<option value={null} disabled selected>
+								{loadingModele ? 'Se încarcă...' : 'Selectează modelul'}
+							</option>
+							{#each modele as m}
+								<option value={m.id}>{m.denumire}</option>
+							{/each}
+						</select>
+						<button type="button" onclick={toggleModelManual} disabled={!marcaId && !marcaManual}
+							class="px-3 py-2 rounded-xl text-xs font-semibold disabled:opacity-40"
+							style="background: var(--surface2); color: var(--muted); border: 1px solid var(--border);">
+							+ Alt
+						</button>
+					{/if}
+				</div>
+			</div>
+
 			{#each [
-				['numar_inmatriculare', 'Nr. înmatriculare *', 'text'],
-				['marca', 'Marcă *', 'text'],
-				['model', 'Model *', 'text'],
 				['an', 'An fabricație', 'number'],
 				['vin', 'VIN (17 caractere)', 'text'],
 			] as [key, label, type]}
