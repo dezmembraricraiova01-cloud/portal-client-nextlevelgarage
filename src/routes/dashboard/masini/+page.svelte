@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api, type Masina, type MasinaForm, type MarcaAuto, type ModelAuto } from '$lib/api';
 	import Skeleton from '$lib/Skeleton.svelte';
+	import Combobox from '$lib/components/Combobox.svelte';
 
 	let masini = $state<Masina[]>([]);
 	let loading = $state(true);
@@ -29,6 +30,9 @@
 	const modelFinal = $derived(
 		modelManual ? modelText.trim() : (modele.find(m => m.id === modelId)?.denumire ?? '')
 	);
+
+	// Combobox lucrează cu {id, nume}; modelele vin cu `denumire`.
+	const modeleOptiuni = $derived(modele.map(m => ({ id: m.id, nume: m.denumire })));
 
 	onMount(async () => {
 		masini = await api.masini();
@@ -120,14 +124,13 @@
 							Listă
 						</button>
 					{:else}
-						<select bind:value={marcaId}
-							class="flex-1 px-3 py-2 rounded-xl text-sm outline-none"
-							style="background: var(--surface2); border: 1px solid var(--border); color: {marcaId ? 'var(--text)' : 'var(--muted)'};">
-							<option value={null} disabled selected>Selectează marca</option>
-							{#each marci as m}
-								<option value={m.id}>{m.nume}</option>
-							{/each}
-						</select>
+						<div class="flex-1">
+							<Combobox
+								optiuni={marci}
+								bind:value={marcaId}
+								placeholder="Scrie marca (ex: Opel)"
+								golText="Nicio marcă găsită — apasă + Alta" />
+						</div>
 						<button type="button" onclick={toggleMarcaManual}
 							class="px-3 py-2 rounded-xl text-xs font-semibold"
 							style="background: var(--surface2); color: var(--muted); border: 1px solid var(--border);">
@@ -151,16 +154,15 @@
 							Listă
 						</button>
 					{:else}
-						<select bind:value={modelId} disabled={!marcaId && !marcaManual}
-							class="flex-1 px-3 py-2 rounded-xl text-sm outline-none disabled:opacity-40"
-							style="background: var(--surface2); border: 1px solid var(--border); color: {modelId ? 'var(--text)' : 'var(--muted)'};">
-							<option value={null} disabled selected>
-								{loadingModele ? 'Se încarcă...' : 'Selectează modelul'}
-							</option>
-							{#each modele as m}
-								<option value={m.id}>{m.denumire}</option>
-							{/each}
-						</select>
+						<div class="flex-1">
+							<Combobox
+								optiuni={modeleOptiuni}
+								bind:value={modelId}
+								disabled={!marcaId && !marcaManual}
+								loading={loadingModele}
+								placeholder="Scrie modelul (ex: Astra)"
+								golText="Niciun model găsit — apasă + Alt" />
+						</div>
 						<button type="button" onclick={toggleModelManual} disabled={!marcaId && !marcaManual}
 							class="px-3 py-2 rounded-xl text-xs font-semibold disabled:opacity-40"
 							style="background: var(--surface2); color: var(--muted); border: 1px solid var(--border);">

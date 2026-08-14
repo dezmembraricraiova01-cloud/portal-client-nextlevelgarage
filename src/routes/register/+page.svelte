@@ -4,6 +4,13 @@
 	import { page } from '$app/state';
 	import { gsap } from 'gsap';
 	import { api, type MarcaAuto, type ModelAuto } from '$lib/api';
+	import { withReturn } from '$lib/sso';
+	import Combobox from '$lib/components/Combobox.svelte';
+
+	// Destinația de după înregistrare (ex: piesa365.ro), primită de la /login.
+	// O ducem mai departe la /verify — el o consumă după validarea codului.
+	const returnRaw   = $derived(page.url.searchParams.get('return'));
+	const loginHref   = $derived(withReturn('/login', returnRaw));
 
 	// ── Date personale ────────────────────────────────────────────────────────
 	let prenume  = $state('');
@@ -47,6 +54,9 @@
 	const modelFinal = $derived(
 		modelManual ? modelText.trim() : (modele.find(m => m.id === modelId)?.denumire ?? '')
 	);
+
+	// Combobox lucrează cu {id, nume}; modelele vin cu `denumire`.
+	const modeleOptiuni = $derived(modele.map(m => ({ id: m.id, nume: m.denumire })));
 
 	const step1Valid = $derived(
 		prenume.trim().length >= 2 &&
@@ -128,11 +138,11 @@
 				politica_versiune: '1.0',
 			});
 			if (cardEl) await gsap.to(cardEl, { opacity: 0, y: -24, scale: 1.02, duration: 0.28, ease: 'power2.in' });
-			goto(`/verify?t=${encodeURIComponent(telefon)}`);
+			goto(withReturn(`/verify?t=${encodeURIComponent(telefon)}`, returnRaw));
 		} catch (e: any) {
 			if (e.status === 409) {
 				const n = e.prenume ? `&n=${encodeURIComponent(e.prenume)}` : '';
-				goto(`/login?t=${encodeURIComponent(telefon)}&auto=1${n}`);
+				goto(withReturn(`/login?t=${encodeURIComponent(telefon)}&auto=1${n}`, returnRaw));
 				return;
 			}
 			error = e.message ?? 'Eroare. Încearcă din nou.';
@@ -238,7 +248,7 @@
 						Continuă
 						<span class="text-base leading-none">→</span>
 					</button>
-					<a href="/login" class="block text-center text-xs" style="color: var(--muted)">
+					<a href={loginHref} class="block text-center text-xs" style="color: var(--muted)">
 						← Ai deja cont? Autentifică-te
 					</a>
 					<div class="flex justify-center gap-3 pt-1 text-[10px]" style="color: var(--muted)">
@@ -286,14 +296,14 @@
 							<div>
 								<label for="marca-select" class="block text-[11px] font-semibold uppercase tracking-wider mb-1" style="color: var(--muted)">Marcă</label>
 								<div class="flex gap-2">
-									<select id="marca-select" bind:value={marcaId}
-										class="flex-1 px-3.5 py-3 rounded-xl text-sm outline-none"
-										style="background: var(--surface2); border: 1.5px solid {marcaId ? 'var(--accent)' : 'var(--border)'}; color: {marcaId ? 'var(--text)' : 'var(--muted)'};">
-										<option value={null} disabled selected>Selectează marca</option>
-										{#each marci as m}
-											<option value={m.id}>{m.nume}</option>
-										{/each}
-									</select>
+									<div class="flex-1">
+										<Combobox
+											id="marca-select"
+											optiuni={marci}
+											bind:value={marcaId}
+											placeholder="Scrie marca (ex: Opel)"
+											golText="Nicio marcă găsită — apasă + Alta" />
+									</div>
 									<button type="button" onclick={toggleMarcaManual}
 										class="px-3 py-2 rounded-xl text-xs font-semibold"
 										style="background: var(--surface2); color: var(--muted); border: 1.5px solid var(--border);">
@@ -327,17 +337,16 @@
 							<div>
 								<label for="model-select" class="block text-[11px] font-semibold uppercase tracking-wider mb-1" style="color: var(--muted)">Model</label>
 								<div class="flex gap-2">
-									<select id="model-select" bind:value={modelId}
-										disabled={!marcaId && !marcaManual}
-										class="flex-1 px-3.5 py-3 rounded-xl text-sm outline-none disabled:opacity-40"
-										style="background: var(--surface2); border: 1.5px solid {modelId ? 'var(--accent)' : 'var(--border)'}; color: {modelId ? 'var(--text)' : 'var(--muted)'};">
-										<option value={null} disabled selected>
-											{loadingModele ? 'Se încarcă...' : 'Selectează modelul'}
-										</option>
-										{#each modele as m}
-											<option value={m.id}>{m.denumire}</option>
-										{/each}
-									</select>
+									<div class="flex-1">
+										<Combobox
+											id="model-select"
+											optiuni={modeleOptiuni}
+											bind:value={modelId}
+											disabled={!marcaId && !marcaManual}
+											loading={loadingModele}
+											placeholder="Scrie modelul (ex: Astra)"
+											golText="Niciun model găsit — apasă + Alt" />
+									</div>
 									<button type="button" onclick={toggleModelManual}
 										disabled={!marcaId && !marcaManual}
 										class="px-3 py-2 rounded-xl text-xs font-semibold disabled:opacity-40"

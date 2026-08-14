@@ -5,12 +5,16 @@
 	import { gsap } from 'gsap';
 	import { api } from '$lib/api';
 	import { auth } from '$lib/stores';
-	import { safeReturnUrl, needsHandoff, rememberSiteOrigin } from '$lib/sso';
+	import { safeReturnUrl, needsHandoff, rememberSiteOrigin, withReturn } from '$lib/sso';
 
 	const telefon    = $derived(page.url.searchParams.get('t') ?? '');
 	const isAuto     = $derived(page.url.searchParams.get('auto') === '1');
 	const prenume    = $derived((page.url.searchParams.get('n') ?? '').trim());
 	const returnUrl  = $derived(page.url.searchParams.get('return') ?? '');
+
+	// „Înapoi la autentificare" păstrează destinația — altfel pasul înapoi
+	// rupe lanțul și te lasă în portal după ce te loghezi.
+	const loginHref  = $derived(withReturn('/login', returnUrl));
 
 	function gotoDashboardOrReturn() {
 		const safe = safeReturnUrl(returnUrl);
@@ -243,7 +247,7 @@
 					🔐 Nu am acces la acest număr
 				</button>
 
-				<a data-anim href="/login" class="block text-center text-xs pt-1" style="color: var(--muted)">
+				<a data-anim href={loginHref} class="block text-center text-xs pt-1" style="color: var(--muted)">
 					← Înapoi la autentificare
 				</a>
 			</div>
@@ -312,7 +316,7 @@
 					⏱ Timp de răspuns estimat: <span class="font-semibold" style="color: var(--text)">24–48 ore lucrătoare</span>
 				</div>
 
-				<a data-anim href="/login"
+				<a data-anim href={loginHref}
 					class="block w-full py-3.5 rounded-2xl text-sm font-semibold text-center transition-all active:scale-[0.98]"
 					style="background: var(--surface2); color: var(--muted); border: 1px solid var(--border); text-decoration: none;">
 					← Înapoi la autentificare
