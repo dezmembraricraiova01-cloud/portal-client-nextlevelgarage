@@ -6,6 +6,7 @@
 	import { api } from '$lib/api';
 	import { auth } from '$lib/stores';
 	import { safeReturnUrl, needsHandoff, rememberSiteOrigin, withReturn } from '$lib/sso';
+	import { marca } from '$lib/brand.svelte';
 
 	let telefon = $state('');
 	let loading = $state(false);
@@ -25,7 +26,10 @@
 	let registerBtn: HTMLElement | undefined = $state();
 	let charEls:     (HTMLElement | undefined)[] = $state([]);
 
-	const TITLE = 'NLG Portal';
+	// Marca e deja decisa de layoutul radacina, sincron, inainte de randarea asta.
+	const TITLE = $derived(marca.val.nume);
+	const esteAccent = (i: number) =>
+		marca.val.accentDeLa !== null && i >= marca.val.accentDeLa;
 	const cleanups: (() => void)[] = [];
 
 	const telefonValid = $derived(/^07\d{8}$/.test(telefon));
@@ -219,12 +223,12 @@
 				<span
 					bind:this={charEls[i]}
 					class="inline-block"
-					style="color: white; white-space: pre;"
+					style="color: {esteAccent(i) ? 'var(--accent)' : 'white'}; white-space: pre;"
 				>{char}</span>
 			{/each}
 		</h1>
 		<p class="text-sm font-medium" style="color: rgba(255,255,255,0.55)">
-			Servicii auto premium — la un SMS distanță
+			{marca.val.subtitlu}
 		</p>
 	</div>
 
@@ -307,7 +311,7 @@
 		</div>
 
 		<p class="text-center text-[11px] mt-5" style="color: rgba(255,255,255,0.22)">
-			Next Level Garage · Servicii auto Cluj-Napoca
+			{marca.val.subsol}
 		</p>
 		<div class="flex justify-center gap-3 mt-2 text-[10px]" style="color: rgba(255,255,255,0.32)">
 			<a href="/legal/privacy" style="color: inherit">Confidențialitate</a>

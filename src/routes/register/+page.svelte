@@ -6,6 +6,7 @@
 	import { api, type MarcaAuto, type ModelAuto } from '$lib/api';
 	import { withReturn } from '$lib/sso';
 	import Combobox from '$lib/components/Combobox.svelte';
+	import Wordmark from '$lib/components/Wordmark.svelte';
 
 	// Destinația de după înregistrare (ex: piesa365.ro), primită de la /login.
 	// O ducem mai departe la /verify — el o consumă după validarea codului.
@@ -158,7 +159,7 @@
 
 	<!-- Logo -->
 	<div class="mb-6 text-center">
-		<div class="text-2xl font-black tracking-tight" style="color: var(--text)">NLG Portal</div>
+		<Wordmark class="text-2xl font-black tracking-tight" style="color: var(--text)" />
 	</div>
 
 	<!-- Progress bar -->

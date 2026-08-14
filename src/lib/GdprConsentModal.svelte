@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { gsap } from 'gsap';
 	import { api, type ConsimtaminteStatus } from '$lib/api';
+	import { marca } from '$lib/brand.svelte';
 
 	let { onAccepted = () => {} }: { onAccepted?: () => void } = $props();
 
@@ -80,7 +81,7 @@
 				<p class="text-xs mt-1" style="color: var(--muted)">
 					{status.versiune_acceptata
 						? `Am actualizat politica de la versiunea ${status.versiune_acceptata} la ${status.versiune_curenta}. Confirmă pentru a continua.`
-						: 'Pentru a folosi NLG Portal, te rugăm să confirmi acordul cu politica noastră.'}
+						: `Pentru a folosi ${marca.val.nume}, te rugăm să confirmi acordul cu politica noastră.`}
 				</p>
 			</div>
 
