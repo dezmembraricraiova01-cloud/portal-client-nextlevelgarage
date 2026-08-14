@@ -4,15 +4,40 @@
 
 const LARAVEL = import.meta.env.VITE_API_URL ?? 'https://wms-main-6oacg2.laravel.cloud';
 
+// Nicio cerere nu are voie sa atarne la nesfarsit: o pornire la rece a
+// serverului sau o retea moarta lasau butonul pe „Se verifica…" pentru
+// totdeauna, fara nicio eroare. 30s e peste orice raspuns normal (masurat
+// pe productie: sub o secunda pe tot drumul, cald).
+const TIMEOUT_MS = 30_000;
+
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
 	const headers: Record<string, string> = { Accept: 'application/json' };
 	if (body !== undefined) headers['Content-Type'] = 'application/json';
 
-	const res = await fetch(url, {
-		method,
-		headers,
-		body: body !== undefined ? JSON.stringify(body) : undefined
-	});
+	// AbortController, nu AbortSignal.timeout: portalul e folosit mai ales de pe
+	// telefon, iar Safari-urile mai vechi nu au varianta scurta.
+	const ctrl = new AbortController();
+	const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+
+	let res: Response;
+	try {
+		res = await fetch(url, {
+			method,
+			headers,
+			body: body !== undefined ? JSON.stringify(body) : undefined,
+			signal: ctrl.signal
+		});
+	} catch (e: any) {
+		throw {
+			status: 0,
+			message:
+				e?.name === 'AbortError'
+					? 'Serverul nu a răspuns la timp. Încearcă din nou.'
+					: 'Conexiune întreruptă. Verifică internetul și încearcă din nou.'
+		};
+	} finally {
+		clearTimeout(timer);
+	}
 
 	if (!res.ok) {
 		const err = await res.json().catch(() => ({ message: 'Eroare necunoscută.' }));
