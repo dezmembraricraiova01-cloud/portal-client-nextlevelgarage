@@ -16,7 +16,7 @@
 	// inaintea copiilor, deci titlul e corect de la prima randare. In onMount ar
 	// fi ajuns dupa animatia de intrare a titlului din /login, care ar fi
 	// re-creat literele si le-ar fi lasat invizibile.
-	if (browser) initMarca(page.url.searchParams.get('return'));
+	if (browser) initMarca(page.url);
 
 	onMount(() => auth.restore());
 </script>
