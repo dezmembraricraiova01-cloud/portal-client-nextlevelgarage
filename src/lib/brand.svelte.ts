@@ -51,21 +51,39 @@ export const marca = {
 };
 
 /**
- * Se cheama o data, din layoutul radacina. `returnRaw` e parametrul ?return=
- * al paginii curente: cand exista si duce spre magazin, marca devine Piesa365
- * si ramane asa; cand lipseste, se foloseste ce s-a memorat inainte.
+ * Se cheama o data, din layoutul radacina, cu URL-ul paginii curente.
+ *
+ * Trei semnale, in ordinea increderii:
+ *  1. `?return=` catre magazin — omul a venit sa se logheze si se intoarce acolo;
+ *  2. `?din=piesa365` — marcaj explicit pus de linkurile din meniul magazinului,
+ *     care NU duc inapoi (Portal client, Profilul meu), deci n-au ce cauta un
+ *     `return`;
+ *  3. `document.referrer` — plasa de siguranta pentru orice alt link din magazin
+ *     pe care l-am uitat. Poate lipsi, daca politica de referrer il taie.
+ * Daca niciunul nu spune nimic, ramane ce s-a memorat la vizita dinainte.
  */
-export function initMarca(returnRaw: string | null | undefined): void {
-	const safe = safeReturnUrl(returnRaw);
-
+export function initMarca(url: URL): void {
+	const safe = safeReturnUrl(url.searchParams.get('return'));
 	if (safe) {
 		try {
+			// `return` e semnal complet: spune si cand NU e magazin (ex. wms.test).
 			seteaza(SSO_HANDOFF_ORIGINS.includes(new URL(safe).origin) ? 'piesa365' : 'nlg');
 
 			return;
 		} catch {
-			/* URL stricat — cadem pe ce e memorat */
+			/* URL stricat — cadem pe semnalele de mai jos */
 		}
+	}
+
+	const din = url.searchParams.get('din');
+	if (din === 'piesa365' || din === 'nlg') {
+		seteaza(din);
+
+		return;
+	}
+
+	if (typeof document !== 'undefined' && document.referrer && aplicaOrigine(document.referrer)) {
+		return;
 	}
 
 	try {
@@ -73,6 +91,24 @@ export function initMarca(returnRaw: string | null | undefined): void {
 		if (salvat === 'piesa365' || salvat === 'nlg') curenta = salvat === 'piesa365' ? PIESA365 : NLG;
 	} catch {
 		/* localStorage indisponibil — ramane implicitul */
+	}
+}
+
+/**
+ * Doar pentru referrer: poate DOAR sa aprinda Piesa365, niciodata sa o stinga.
+ * Un referrer strain (motor de cautare, link din mail) nu spune nimic despre
+ * marca, deci nu trebuie sa reseteze ce stim deja.
+ */
+function aplicaOrigine(url: string): boolean {
+	try {
+		const origine = new URL(url).origin;
+		if (!SSO_HANDOFF_ORIGINS.includes(origine)) return false;
+
+		seteaza('piesa365');
+
+		return true;
+	} catch {
+		return false;
 	}
 }
 
