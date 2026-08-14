@@ -1,20 +1,28 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	import { auth } from '$lib/stores';
 	import { page } from '$app/state';
 	import CookieBanner from '$lib/CookieBanner.svelte';
+	import { marca, initMarca } from '$lib/brand.svelte';
 
 	let { children } = $props();
 
 	const AUTH_PATHS = new Set(['/login', '/register', '/verify']);
 	const isAuth = $derived(AUTH_PATHS.has(page.url.pathname as string));
 
+	// Marca se decide AICI, sincron, nu in onMount: scriptul layoutului ruleaza
+	// inaintea copiilor, deci titlul e corect de la prima randare. In onMount ar
+	// fi ajuns dupa animatia de intrare a titlului din /login, care ar fi
+	// re-creat literele si le-ar fi lasat invizibile.
+	if (browser) initMarca(page.url.searchParams.get('return'));
+
 	onMount(() => auth.restore());
 </script>
 
 <svelte:head>
-	<title>NLG Portal</title>
+	<title>{marca.val.nume}</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 </svelte:head>
 
