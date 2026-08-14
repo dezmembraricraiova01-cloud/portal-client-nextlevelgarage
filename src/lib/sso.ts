@@ -56,6 +56,18 @@ export function safeReturnUrl(raw: string | null | undefined): string | null {
 	}
 }
 
+// Propagă ?return= mai departe în lanțul login → register → verify. Doar
+// `/verify` îl consumă, dar cine intră pe ramura de înregistrare trece prin
+// `/register` — fără propagare, clientul venit din piesa365 termina OTP-ul și
+// ateriza în dashboardul portalului, nu înapoi în magazin.
+// Trece prin safeReturnUrl: în link nu ajunge niciodată o origine nepermisă.
+export function withReturn(path: string, raw: string | null | undefined): string {
+	const safe = safeReturnUrl(raw);
+	if (!safe) return path;
+
+	return path + (path.includes('?') ? '&' : '?') + 'return=' + encodeURIComponent(safe);
+}
+
 export function needsHandoff(url: string): boolean {
 	try {
 		return SSO_HANDOFF_ORIGINS.includes(new URL(url).origin);

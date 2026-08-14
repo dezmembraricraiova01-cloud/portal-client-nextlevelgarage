@@ -5,7 +5,7 @@
 	import { gsap } from 'gsap';
 	import { api } from '$lib/api';
 	import { auth } from '$lib/stores';
-	import { safeReturnUrl, needsHandoff, rememberSiteOrigin } from '$lib/sso';
+	import { safeReturnUrl, needsHandoff, rememberSiteOrigin, withReturn } from '$lib/sso';
 
 	let telefon = $state('');
 	let loading = $state(false);
@@ -33,6 +33,13 @@
 		const r = page.url.searchParams.get('return') ?? '';
 		return /^https?:\/\//i.test(r) ? r : '';
 	});
+
+	// Ramura de înregistrare duce ?return= mai departe — altfel clientul venit
+	// din piesa365 termină înregistrarea și rămâne în portal.
+	const registerCuTelefonHref = $derived(
+		withReturn('/register?t=' + encodeURIComponent(telefon), page.url.searchParams.get('return'))
+	);
+	const registerHref = $derived(withReturn('/register', page.url.searchParams.get('return')));
 
 	// Pulse pe buton când numărul devine valid
 	$effect(() => {
@@ -241,7 +248,7 @@
 								Numărul <span class="font-semibold" style="color: white">{telefon}</span>
 								nu are încă un cont. Îți poți crea unul în mai puțin de un minut.
 							</p>
-							<a href="/register?t={encodeURIComponent(telefon)}"
+							<a href={registerCuTelefonHref}
 								class="block w-full py-2.5 rounded-lg text-sm font-bold text-center active:scale-[0.98]"
 								style="background: var(--accent); color: white; text-decoration: none;">
 								Creează cont cu acest număr
@@ -269,7 +276,7 @@
 			<!-- Register CTA -->
 			<div class="px-6 pb-6">
 				<a bind:this={registerBtn}
-					href="/register"
+					href={registerHref}
 					class="group w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all active:scale-[0.98]"
 					style="background: rgba(255,255,255,0.05); border: 1.5px solid rgba(255,255,255,0.09); text-decoration: none; display: flex;">
 					<span class="text-2xl leading-none">✨</span>
