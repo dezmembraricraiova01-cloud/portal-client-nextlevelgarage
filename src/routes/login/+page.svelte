@@ -19,8 +19,10 @@
 	// DOM refs — nu au nevoie de reactivitate, sunt folosite doar în GSAP
 	let cardEl:      HTMLElement | undefined;
 	let formEl:      HTMLElement | undefined;
-	let submitBtn:   HTMLElement | undefined;
-	let registerBtn: HTMLElement | undefined;
+	// Astea două SE schimbă: panoul „nu ai cont" le scoate din DOM și le pune
+	// la loc. Ca `$state`, efectul magnetic se re-leagă de elementul nou.
+	let submitBtn:   HTMLElement | undefined = $state();
+	let registerBtn: HTMLElement | undefined = $state();
 	let charEls:     (HTMLElement | undefined)[] = $state([]);
 
 	const TITLE = 'NLG Portal';
@@ -49,6 +51,36 @@
 				{ scale: 1, duration: 0.5, ease: 'elastic.out(1.2, 0.4)' }
 			);
 		}
+	});
+
+	// Butoane magnetice. Ca efect, nu în onMount: ambele butoane sunt
+	// condiționate, deci elementul se schimbă și listenerii trebuie mutați
+	// pe cel nou — altfel efectul moare după prima trecere prin panou.
+	$effect(() => {
+		if (window.matchMedia('(pointer: coarse)').matches) return;
+
+		const off: (() => void)[] = [];
+
+		for (const btn of [submitBtn, registerBtn]) {
+			if (!btn) continue;
+
+			const onMove = (e: MouseEvent) => {
+				const r  = btn.getBoundingClientRect();
+				const dx = (e.clientX - (r.left + r.width  / 2)) * 0.28;
+				const dy = (e.clientY - (r.top  + r.height / 2)) * 0.28;
+				gsap.to(btn, { x: dx, y: dy, duration: 0.3, ease: 'power2.out' });
+			};
+			const onLeave = () => gsap.to(btn, { x: 0, y: 0, duration: 0.65, ease: 'elastic.out(1, 0.4)' });
+
+			btn.addEventListener('mousemove', onMove);
+			btn.addEventListener('mouseleave', onLeave);
+			off.push(() => {
+				btn.removeEventListener('mousemove', onMove);
+				btn.removeEventListener('mouseleave', onLeave);
+			});
+		}
+
+		return () => off.forEach(fn => fn());
 	});
 
 	onMount(() => {
@@ -104,25 +136,6 @@
 			};
 			window.addEventListener('mousemove', onParallax);
 			cleanups.push(() => window.removeEventListener('mousemove', onParallax));
-		}
-
-		// ── 4. Magnetic buttons ───────────────────────────────────────────────
-		if (!touch) {
-			[submitBtn, registerBtn].filter(Boolean).forEach(btn => {
-				const onMove = (e: MouseEvent) => {
-					const r  = btn!.getBoundingClientRect();
-					const dx = (e.clientX - (r.left + r.width  / 2)) * 0.28;
-					const dy = (e.clientY - (r.top  + r.height / 2)) * 0.28;
-					gsap.to(btn!, { x: dx, y: dy, duration: 0.3, ease: 'power2.out' });
-				};
-				const onLeave = () => gsap.to(btn!, { x: 0, y: 0, duration: 0.65, ease: 'elastic.out(1, 0.4)' });
-				btn!.addEventListener('mousemove', onMove);
-				btn!.addEventListener('mouseleave', onLeave);
-				cleanups.push(() => {
-					btn!.removeEventListener('mousemove', onMove);
-					btn!.removeEventListener('mouseleave', onLeave);
-				});
-			});
 		}
 
 		// Dev shortcut: Ctrl+Shift+X. Plus URL ?dev=1 ca fallback fara tastatura.
@@ -266,6 +279,9 @@
 				</form>
 			</div>
 
+			<!-- Cât timp panoul „nu ai cont" e pe ecran, ruta de înregistrare e deja
+			     oferită acolo: al doilea buton, sub un „sau", doar încurcă. -->
+			{#if !needsRegistration}
 			<!-- Divider -->
 			<div class="mx-6 my-5 flex items-center gap-3">
 				<div class="flex-1 h-px" style="background: rgba(255,255,255,0.07)"></div>
@@ -287,6 +303,7 @@
 					<span class="text-base" style="color: rgba(255,255,255,0.22)">›</span>
 				</a>
 			</div>
+			{/if}
 		</div>
 
 		<p class="text-center text-[11px] mt-5" style="color: rgba(255,255,255,0.22)">
