@@ -39,6 +39,10 @@
 	let loading = $state(false);
 	let error   = $state('');
 
+	// „Dureaza mai mult decat de obicei" — vezi submit().
+	let dureaza      = $state(false);
+	let dureazaTimer: ReturnType<typeof setTimeout> | undefined;
+
 	// Retrimite cod
 	let resendCountdown = $state(60);
 	let resendOk        = $state(false);
@@ -107,6 +111,7 @@
 		return () => {
 			window.removeEventListener('keydown', onKey);
 			if (countdownTimer) clearInterval(countdownTimer);
+			clearTimeout(dureazaTimer);
 		};
 	});
 
@@ -129,6 +134,13 @@
 
 	async function submit() {
 		error = ''; loading = true;
+
+		// Prima cerere dupa o perioada de inactivitate poate astepta pornirea
+		// serverului. Fara un semn, butonul „Se verifica…" arata exact ca o
+		// pagina blocata si omul inchide tabul crezand ca a picat.
+		dureaza = false;
+		dureazaTimer = setTimeout(() => { dureaza = true; }, 5000);
+
 		try {
 			const res = await api.verifyOtp(telefon, cod);
 			if (containerEl) await gsap.to(containerEl, { opacity: 0, y: -28, scale: 1.02, duration: 0.28, ease: 'power2.in' });
@@ -137,7 +149,11 @@
 		} catch (e: any) {
 			error = e.message ?? 'Cod incorect sau expirat.';
 			shake(formEl);
-		} finally { loading = false; }
+		} finally {
+			loading = false;
+			clearTimeout(dureazaTimer);
+			dureaza = false;
+		}
 	}
 
 	async function trimiteCerere() {
@@ -217,6 +233,12 @@
 					style="background: var(--accent); color: white;">
 					{loading ? 'Se verifică...' : 'Continuă'}
 				</button>
+
+				{#if loading && dureaza}
+					<p class="text-xs text-center" style="color: var(--muted)">
+						Durează mai mult decât de obicei — nu închide pagina.
+					</p>
+				{/if}
 
 				<!-- Retrimite cod -->
 				<div data-anim class="text-center py-0.5">
