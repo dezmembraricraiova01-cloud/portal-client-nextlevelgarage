@@ -145,22 +145,30 @@
 			{loadError}
 		</div>
 	{:else if masina}
-		<!-- Step indicator (4 pași: Vehicul ✓ · Date · Extras · Confirmă) -->
+		<!-- Step indicator (4 pași: Vehicul ✓ · Date · Extras · Confirmă)
+		     Pașii sunt APĂSABILI: bifa ✓ promite că te poți întoarce, iar înainte
+		     se putea doar din săgeată, câte un pas. Datele rămân completate. -->
 		<div class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider overflow-x-auto">
-			<span class="step-dot step-done">✓</span>
+			<a href="/dashboard/inchirieri" class="step-dot step-done" style="text-decoration: none;" aria-label="Înapoi la flotă">✓</a>
 			<span style="color: var(--muted)" class="hidden sm:inline">Vehicul</span>
 			<span class="flex-1 h-px min-w-[12px]" style="background: var(--border)"></span>
 
-			<span class="step-dot {step === 1 ? 'step-active' : 'step-done'}">{step > 1 ? '✓' : '2'}</span>
-			<span style="color: {step === 1 ? 'var(--text)' : 'var(--muted)'}">Date</span>
+			<button type="button" onclick={() => (step = 1)} aria-current={step === 1 ? 'step' : undefined}
+				class="step-dot {step === 1 ? 'step-active' : 'step-done'}" aria-label="Schimbă datele">{step > 1 ? '✓' : '2'}</button>
+			<button type="button" onclick={() => (step = 1)} style="color: {step === 1 ? 'var(--text)' : 'var(--muted)'}"
+				class="uppercase tracking-wider">Date</button>
 			<span class="flex-1 h-px min-w-[12px]" style="background: var(--border)"></span>
 
-			<span class="step-dot {step === 2 ? 'step-active' : (step > 2 ? 'step-done' : 'step-pending')}">{step > 2 ? '✓' : '3'}</span>
-			<span style="color: {step === 2 ? 'var(--text)' : 'var(--muted)'}">Extras</span>
+			<button type="button" onclick={() => canGoStep2 && (step = 2)} disabled={!canGoStep2} aria-current={step === 2 ? 'step' : undefined}
+				class="step-dot {step === 2 ? 'step-active' : (step > 2 ? 'step-done' : 'step-pending')}" aria-label="Servicii suplimentare">{step > 2 ? '✓' : '3'}</button>
+			<button type="button" onclick={() => canGoStep2 && (step = 2)} disabled={!canGoStep2}
+				style="color: {step === 2 ? 'var(--text)' : 'var(--muted)'}" class="uppercase tracking-wider disabled:opacity-60">Extras</button>
 			<span class="flex-1 h-px min-w-[12px]" style="background: var(--border)"></span>
 
-			<span class="step-dot {step === 3 ? 'step-active' : 'step-pending'}">4</span>
-			<span style="color: {step === 3 ? 'var(--text)' : 'var(--muted)'}">Confirmă</span>
+			<button type="button" onclick={() => canGoStep3 && (step = 3)} disabled={!canGoStep3} aria-current={step === 3 ? 'step' : undefined}
+				class="step-dot {step === 3 ? 'step-active' : 'step-pending'}" aria-label="Confirmă rezervarea">4</button>
+			<button type="button" onclick={() => canGoStep3 && (step = 3)} disabled={!canGoStep3}
+				style="color: {step === 3 ? 'var(--text)' : 'var(--muted)'}" class="uppercase tracking-wider disabled:opacity-60">Confirmă</button>
 		</div>
 
 		{#if formSuccess}
@@ -508,9 +516,16 @@
 							<span style="color: var(--muted)">Mașină</span>
 							<span class="font-semibold" style="color: var(--text)">{masina.marca} {masina.model}</span>
 						</div>
-						<div class="flex justify-between">
+						<div class="flex justify-between items-center gap-2">
 							<span style="color: var(--muted)">Perioadă</span>
-							<span class="font-semibold" style="color: var(--text)">{fmtDate(dataStart)} → {fmtDate(dataEnd)}</span>
+							<span class="flex items-center gap-2">
+								<span class="font-semibold" style="color: var(--text)">{fmtDate(dataStart)} → {fmtDate(dataEnd)}</span>
+								<!-- Răzgândirea trebuie să fie la îndemână chiar aici, nu doar
+								     prin doi pași înapoi din săgeată. -->
+								<button type="button" onclick={() => (step = 1)}
+									class="shrink-0 text-[11px] font-semibold underline"
+									style="color: var(--accent);">schimbă</button>
+							</span>
 						</div>
 						<div class="flex justify-between">
 							<span style="color: var(--muted)">Închiriere</span>
@@ -620,7 +635,14 @@
 		font-size: 11px;
 		font-weight: 700;
 		flex-shrink: 0;
+		/* Sunt butoane acum, nu span-uri: le ținem înfățișarea, dar arătăm că se apasă. */
+		border: none;
+		cursor: pointer;
+		transition: transform 0.15s ease, opacity 0.15s ease;
 	}
+	.step-dot:disabled { cursor: default; }
+	.step-dot:not(:disabled):hover { transform: scale(1.08); }
+	.step-dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 	.step-active {
 		background: var(--accent);
 		color: white;
