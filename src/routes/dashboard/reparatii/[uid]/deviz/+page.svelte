@@ -259,8 +259,13 @@
 			</div>
 
 			<!-- Footer sticky cu acțiuni -->
-			<div class="fixed bottom-0 left-0 right-0 z-20 px-4 pb-6 pt-4 space-y-3"
-				style="background: var(--bg); border-top: 1px solid var(--border); box-shadow: 0 -8px 32px #0008;">
+			<!-- Spatiu cat bara de mai jos, altfel ultimele linii din deviz raman sub ea. -->
+			<div style="height: calc(var(--nav-h, 64px) + 140px);"></div>
+
+			<!-- Deasupra navigației, nu sub ea: cu `bottom-0` și z-20 bara era
+			     acoperită complet de meniul de jos, care stă pe z-50. -->
+			<div class="fixed left-0 right-0 z-40 px-4 pb-6 pt-4 space-y-3"
+				style="bottom: var(--nav-h, 64px); background: var(--bg); border-top: 1px solid var(--border); box-shadow: 0 -8px 32px #0008;">
 
 				<div class="flex justify-between items-center">
 					<span class="text-sm" style="color: var(--muted)">{idsAprobate.size} din {items.length} selectate</span>
