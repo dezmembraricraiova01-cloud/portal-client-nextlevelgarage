@@ -23,6 +23,14 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
+  // Doar http(s) și doar GET. Cache API refuză orice altă schemă, iar extensiile
+  // din browser încarcă resurse „chrome-extension://" chiar în pagina noastră —
+  // service workerul le prindea și `cache.put` arunca „Request scheme
+  // 'chrome-extension' is unsupported" la fiecare. POST-urile nu se pot stoca
+  // deloc. Lăsăm cererea să meargă normal, fără să ne atingem de ea.
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+  if (e.request.method !== 'GET') return;
+
   // API calls — network-first, fără cache
   if (url.pathname.startsWith('/api/')) {
     e.respondWith(
@@ -50,7 +58,8 @@ self.addEventListener('fetch', (e) => {
       caches.open(CACHE_NAME).then(async (cache) => {
         const cached = await cache.match(e.request);
         const fetchPromise = fetch(e.request).then((res) => {
-          if (res.ok) cache.put(e.request, res.clone());
+          // 206 e „ok" după `res.ok`, dar Cache API refuză răspunsurile parțiale.
+          if (res.ok && res.status !== 206) cache.put(e.request, res.clone());
           return res;
         });
         return cached ?? fetchPromise;
