@@ -97,7 +97,12 @@
 				if (clasaAleasa && m.clasa !== clasaAleasa) return false;
 				// Mașinile fără tarif se ofertează la telefon — nu le ascundem
 				// sub o limită de preț, altfel dispare marfă din vitrină.
-				if (pretMaxim > 0 && m.tarif_zi > 0 && m.tarif_zi > pretMaxim) return false;
+				//
+				// Se filtrează pe prețul pe care clientul îl VEDE pe card: cel exact
+				// când datele sunt alese, altfel „de la". Filtrat doar pe `tarif_zi`,
+				// limita n-ar face nimic înainte de alegerea intervalului, când el e null.
+				const pretVizibil = m.tarif_zi ?? m.tarif_de_la;
+				if (pretMaxim > 0 && pretVizibil && pretVizibil > pretMaxim) return false;
 				return true;
 			})
 			// disponibilele primele când avem interval
@@ -355,7 +360,12 @@
 					style="background: {activ ? '#eab308' : 'var(--surface)'};
 					       color: {activ ? '#1a1a1a' : 'var(--muted)'};
 					       border: 1px solid {activ ? '#eab308' : 'var(--border)'};">
-					{c.clasa} {c.nr}
+					{c.eticheta}
+					{#if c.de_la}
+						<span class="font-normal opacity-80">· de la {c.de_la.toFixed(0)} lei</span>
+					{:else}
+						<span class="font-normal opacity-80">{c.nr}</span>
+					{/if}
 				</button>
 			{/each}
 		</div>
@@ -544,17 +554,29 @@
 							{/if}
 						</div>
 
+						<!-- Ce intră în preț. Cinci argumente care nu apăreau nicăieri pe pagină. -->
+						<p class="text-[9px] leading-tight font-semibold" style="color: var(--muted)">
+							{#if m.km_nelimitati}Km nelimitați · {:else if m.km_inclusi_zi}{m.km_inclusi_zi} km/zi · {/if}RCA · rovinietă · fără depozit
+						</p>
+
 						<!-- Price + CTA -->
 						<div class="flex items-end justify-between gap-2 pt-1">
 							<div class="min-w-0">
-								{#if m.tarif_zi > 0}
-									<p class="text-[9px] font-semibold uppercase tracking-wider leading-none" style="color: var(--muted)">de la</p>
+								{#if m.tarif_zi}
+									<!-- Datele sunt alese: prețul e exact, nu „de la" -->
+									<p class="text-[9px] font-semibold uppercase tracking-wider leading-none" style="color: var(--muted)">{nrZile} {nrZile === 1 ? 'zi' : 'zile'}</p>
 									<p class="font-bold leading-tight" style="color: var(--text)">
 										<span class="text-lg">{m.tarif_zi.toFixed(0)}</span><span class="text-[10px] font-normal" style="color: var(--muted)"> lei/zi</span>
 									</p>
-									{#if m.km_inclusi_zi}
-										<p class="text-[9px] leading-tight mt-0.5" style="color: var(--muted)">{m.km_inclusi_zi} km/zi incluși</p>
-									{/if}
+									<p class="text-[9px] leading-tight mt-0.5" style="color: var(--muted)">
+										{(m.tarif_zi * nrZile).toFixed(0)} lei total
+									</p>
+								{:else if m.tarif_de_la}
+									<p class="text-[9px] font-semibold uppercase tracking-wider leading-none" style="color: var(--muted)">de la</p>
+									<p class="font-bold leading-tight" style="color: var(--text)">
+										<span class="text-lg">{m.tarif_de_la.toFixed(0)}</span><span class="text-[10px] font-normal" style="color: var(--muted)"> lei/zi</span>
+									</p>
+									<p class="text-[9px] leading-tight mt-0.5" style="color: var(--muted)">alege datele pentru preț exact</p>
 								{:else}
 									<p class="text-[10px] font-semibold uppercase tracking-wider leading-none" style="color: var(--muted)">tarif</p>
 									<p class="text-sm font-bold leading-tight" style="color: var(--text)">la cerere</p>
@@ -652,6 +674,7 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
+
 
 	.spec-pill {
 		display: inline-flex;

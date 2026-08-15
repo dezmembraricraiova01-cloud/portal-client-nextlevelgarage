@@ -990,16 +990,32 @@ export interface MasinaInchiriereCard {
 	are_ac:              boolean;
 	is_4wd:              boolean;
 	putere_cp:           number | null;
-	tarif_zi:            number;
+	/** Prețul pe zi pentru intervalul ales. `null` = n-au fost alese datele, sau nu există tarif. */
+	tarif_zi:            number | null;
+	/** Cel mai ieftin preț pe zi al mașinii — ce se arată înainte de alegerea datelor. */
+	tarif_de_la:         number | null;
 	km_inclusi_zi:       number;
+	/** 0 km incluși înseamnă NELIMITAT, nu zero. */
+	km_nelimitati:       boolean;
 	tarif_km_extra:      number;
 	foto_url:            string | null;
 	clasa:               string | null;
+	clasa_eticheta:      string | null;
 	categoria:           string;
 	rezervari_azi:       number;
 	disponibila_interval: boolean | null;
 }
 
+/** O treaptă de durată din grila de tarife. `tarif: null` = la cerere pentru durata aia. */
+export interface TreaptaTarif {
+	treapta:  string;
+	eticheta: string;
+	zile_min: number;
+	zile_max: number | null;
+	tarif:    number | null;
+}
+
+/** Clasele reprezentate în flotă, cu prețul de intrare — bara de filtre. */
 export interface MasinaInchiriereDetaliu extends MasinaInchiriereCard {
 	vin:           string | null;
 	motorizare:    string | null;
@@ -1014,6 +1030,7 @@ export interface MasinaInchiriereDetaliu extends MasinaInchiriereCard {
 	dotari:        string[];
 	observatii:    string | null;
 	poze:          string[];
+	tarife_trepte: TreaptaTarif[];
 }
 
 export interface IntervalBlocat {
@@ -1048,6 +1065,10 @@ export interface LocInchiriere {
 export interface ClasaFlota {
 	clasa: string;
 	nr:    number;
+	/** Eticheta cu diacritice — în bază clasele n-au. */
+	eticheta: string;
+	/** Cel mai ieftin preț pe zi al clasei; `null` = nicio mașină cu tarif. */
+	de_la:    number | null;
 }
 
 /** Capetele intervalului de preț din flotă. `max = 0` ⇒ niciun tarif setat. */
