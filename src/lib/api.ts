@@ -47,6 +47,31 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
 	return res.json();
 }
 
+/**
+ * Trimitere de fișier prin proxy. `request()` nu merge aici: el pune
+ * Content-Type application/json și serializează corpul, iar un FormData trebuie
+ * lăsat pe seama browserului, care își scrie singur boundary-ul.
+ */
+async function trimiteFormular<T>(url: string, form: FormData): Promise<T> {
+	let res: Response;
+
+	try {
+		res = await fetch(url, { method: 'POST', body: form });
+	} catch {
+		throw { status: 0, message: 'Conexiune întreruptă. Încearcă din nou.' };
+	}
+
+	if (!res.ok) {
+		const err = await res.json().catch(() => ({}));
+		// Laravel întoarce erorile de validare în `errors`; luăm prima, e cea utilă.
+		const primaValidare = err.errors ? (Object.values(err.errors)[0] as string[])?.[0] : null;
+
+		throw { status: res.status, message: primaValidare ?? err.message ?? 'Încărcarea nu a reușit.' };
+	}
+
+	return res.json();
+}
+
 // Apel public direct la Laravel (fara auth)
 const pub = <T>(method: string, path: string, body?: unknown) =>
 	request<T>(method, `${LARAVEL}/api/portal${path}`, body);
@@ -156,6 +181,37 @@ export const api = {
 		if (!res.ok) { const e = await res.json().catch(() => ({})); throw { status: res.status, message: e.message ?? 'Eroare upload.' }; }
 		return res.json();
 	},
+	/**
+	 * Actele mașinii — ITP, RCA, CASCO, carte verde poartă dată de expirare;
+	 * talonul, CIV-ul și rovinieta intră doar ca fișier (la mașina de client nu
+	 * există unde să stea valabilitatea lor).
+	 */
+	uploadActMasina: async (
+		masinaId: number,
+		date: { tip: string; fisier: File; valabil_pana?: string; asigurator?: string; numar?: string }
+	): Promise<{ id: number; tip: string; message: string }> => {
+		const form = new FormData();
+		form.append('tip', date.tip);
+		form.append('fisier', date.fisier);
+		if (date.valabil_pana) form.append('valabil_pana', date.valabil_pana);
+		if (date.asigurator) form.append('asigurator', date.asigurator);
+		if (date.numar) form.append('numar', date.numar);
+
+		return trimiteFormular(`/api/portal/masini/${masinaId}/documente`, form);
+	},
+
+	/** Cartea de identitate și permisul. Intră neverificate — le confirmă un operator. */
+	uploadActIdentitate: async (
+		date: { tip: 'ci' | 'permis'; fisier: File; data_expirare?: string }
+	): Promise<{ id: number; tip: string; message: string }> => {
+		const form = new FormData();
+		form.append('tip', date.tip);
+		form.append('fisier', date.fisier);
+		if (date.data_expirare) form.append('data_expirare', date.data_expirare);
+
+		return trimiteFormular('/api/portal/identitate', form);
+	},
+
 	deleteMasinaFoto: (masinaId: number, fotoId: number) =>
 		priv<{ message: string }>('DELETE', `/masini/${masinaId}/foto/${fotoId}`),
 	reorderFotos: (masinaId: number, ids: number[]) =>

@@ -2,6 +2,7 @@
 	import { onMount, tick } from 'svelte';
 	import { api, type Client, type Masina, type MasinaFoto, type ConsimtaminteStatus } from '$lib/api';
 	import { auth } from '$lib/stores';
+	import IncarcaAct from '$lib/components/IncarcaAct.svelte';
 
 	let client  = $state<Client | null>(null);
 	let masini  = $state<Masina[]>([]);
@@ -307,14 +308,18 @@
 						<div class="text-xs mb-2" style="color: var(--muted)">Documente</div>
 						<div class="space-y-1.5">
 							{#if client.ci_lipsa}
-								<div class="flex items-center gap-2 text-xs px-3 py-2 rounded-lg" style="background: #eab30815; color: #eab308; border: 1px solid #eab30830;">
-									⚠️ Carte de identitate lipsă — prezentați-vă la service
-								</div>
+								<IncarcaAct
+									eticheta="Carte de identitate"
+									descriere="Fotografiaz-o sau alege fișierul — o verificăm noi."
+									incarca={(fisier) => api.uploadActIdentitate({ tip: 'ci', fisier })}
+								/>
 							{/if}
 							{#if client.permis_lipsa}
-								<div class="flex items-center gap-2 text-xs px-3 py-2 rounded-lg" style="background: #eab30815; color: #eab308; border: 1px solid #eab30830;">
-									⚠️ Permis de conducere lipsă — prezentați-vă la service
-								</div>
+								<IncarcaAct
+									eticheta="Permis de conducere"
+									descriere="Fotografiază-l sau alege fișierul — îl verificăm noi."
+									incarca={(fisier) => api.uploadActIdentitate({ tip: 'permis', fisier })}
+								/>
 							{/if}
 						</div>
 					</div>
@@ -449,7 +454,7 @@
 		<!-- Notă prospect -->
 		{#if client.are_restante || client.ci_lipsa || client.permis_lipsa}
 			<div class="px-4 py-3 rounded-xl text-xs" style="background: var(--surface); border: 1px solid var(--border); color: var(--muted);">
-				📋 Pentru a beneficia de toate serviciile, completați dosarul la prima vizită la service.
+				📋 Poți completa dosarul chiar de aici — actele încărcate se verifică la prima ta vizită.
 			</div>
 		{/if}
 
