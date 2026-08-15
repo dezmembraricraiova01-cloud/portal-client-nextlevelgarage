@@ -288,6 +288,7 @@ export const api = {
 			masini:   MasinaInchiriereCard[];
 			locuri:   LocInchiriere[];
 			clase:    ClasaFlota[];
+			preturi:  PraguriPret;
 			interval: { from: string; to: string; zile: number } | null;
 		}>('GET', `/inchirieri/flota${query ? `?${query}` : ''}`);
 	},
@@ -1047,6 +1048,14 @@ export interface LocInchiriere {
 export interface ClasaFlota {
 	clasa: string;
 	nr:    number;
+}
+
+/** Capetele intervalului de preț din flotă. `max = 0` ⇒ niciun tarif setat. */
+export interface PraguriPret {
+	min:        number;
+	max:        number;
+	/** Mașini care se ofertează la telefon; nu intră sub o limită de preț. */
+	fara_tarif: number;
 }
 
 /** Locul unei cereri, gata de afișat. */
