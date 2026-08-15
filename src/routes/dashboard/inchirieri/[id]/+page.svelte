@@ -55,7 +55,21 @@
 		return z > 0 ? z : 0;
 	});
 
-	let costMasina = $derived(masina ? Math.round(nrZile * masina.tarif_zi * 100) / 100 : 0);
+	/** Treapta în care cade durata aleasă — sursa prețului afișat și a totalului. */
+	let treaptaCurenta = $derived.by(() => {
+		if (!masina || nrZile < 1) return null;
+		return masina.tarife_trepte?.find(
+			t => nrZile >= t.zile_min && (t.zile_max === null || nrZile <= t.zile_max)
+		) ?? null;
+	});
+
+	/** Prețul exact pentru durata aleasă; `null` cât timp nu s-au ales datele. */
+	let tarifCurent = $derived(treaptaCurenta?.tarif ?? null);
+
+	/** Ce se afișează mare: prețul exact dacă există, altfel „de la". */
+	let tarifAfisat = $derived(tarifCurent ?? masina?.tarif_de_la ?? null);
+
+	let costMasina = $derived(tarifCurent ? Math.round(nrZile * tarifCurent * 100) / 100 : 0);
 
 	let extraseAlese = $derived(extras.filter(e => selectedExtras[e.cod]));
 
@@ -500,15 +514,24 @@
 				<!-- Hero price + categorie chip -->
 				<div class="relative flex items-start justify-between gap-3">
 					<div class="min-w-0">
-						<p class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--muted)">Tarif/zi · TVA inclus</p>
-						<p class="font-bold leading-none mt-1" style="color: #34d399; text-shadow: 0 0 24px color-mix(in srgb, #10b981 40%, transparent);">
-							<span class="text-4xl sm:text-5xl">{masina.tarif_zi.toFixed(0)}</span><span class="text-base font-normal ml-0.5" style="color: var(--muted)"> lei</span>
+						<p class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--muted)">
+							{#if tarifCurent}Tarif/zi · {treaptaCurenta?.eticheta} · TVA inclus{:else if tarifAfisat}De la · TVA inclus{:else}Tarif{/if}
 						</p>
-						{#if masina.km_inclusi_zi}
-							<p class="text-[11px] mt-1.5" style="color: var(--muted)">
-								<span class="font-bold" style="color: {theme.accent};">{masina.km_inclusi_zi} km/zi</span> incluși{masina.tarif_km_extra > 0 ? ` · extra ${masina.tarif_km_extra.toFixed(2)} lei/km` : ''}
+						{#if tarifAfisat}
+							<p class="font-bold leading-none mt-1" style="color: #34d399; text-shadow: 0 0 24px color-mix(in srgb, #10b981 40%, transparent);">
+								<span class="text-4xl sm:text-5xl">{tarifAfisat.toFixed(0)}</span><span class="text-base font-normal ml-0.5" style="color: var(--muted)"> lei</span>
 							</p>
+						{:else}
+							<p class="font-bold leading-none mt-1 text-2xl" style="color: var(--text)">la cerere</p>
+							<p class="text-[11px] mt-1.5" style="color: var(--muted)">te sunăm cu oferta</p>
 						{/if}
+						<p class="text-[11px] mt-1.5" style="color: var(--muted)">
+							{#if masina.km_nelimitati}
+								<span class="font-bold" style="color: {theme.accent};">Km nelimitați</span> · RCA · rovinietă · fără depozit
+							{:else if masina.km_inclusi_zi}
+								<span class="font-bold" style="color: {theme.accent};">{masina.km_inclusi_zi} km/zi</span> incluși{masina.tarif_km_extra > 0 ? ` · extra ${masina.tarif_km_extra.toFixed(2)} lei/km` : ''}
+							{/if}
+						</p>
 					</div>
 					<span class="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-md inline-flex items-center gap-1"
 						style="background: {theme.chipBg}; color: {theme.chip}; border: 1px solid {theme.chipBorder};">
@@ -516,6 +539,28 @@
 						{theme.name}
 					</span>
 				</div>
+
+				<!-- Grila de trepte: argumentul „stai mai mult, plătești mai puțin", vizibil.
+				     Rândul duratei alese e evidențiat; treptele fără preț rămân la vedere. -->
+				{#if masina.tarife_trepte?.some(t => t.tarif)}
+					<div class="relative mt-4 rounded-xl overflow-hidden" style="border: 1px solid var(--border); background: var(--surface);">
+						<p class="text-[10px] font-bold uppercase tracking-wider px-3 pt-2.5 pb-1.5" style="color: var(--muted)">
+							Cu cât stai mai mult, cu atât e mai ieftin
+						</p>
+						{#each masina.tarife_trepte as t (t.treapta)}
+							{@const activ = treaptaCurenta?.treapta === t.treapta}
+							<div class="flex items-center justify-between gap-3 px-3 py-2 text-[12px]"
+								style="border-top: 1px solid var(--border); {activ ? `background: color-mix(in srgb, ${theme.accent} 12%, transparent);` : ''}">
+								<span style="color: {activ ? 'var(--text)' : 'var(--muted)'}; font-weight: {activ ? 700 : 500};">
+									{t.eticheta}{#if activ}<span class="ml-1.5 text-[9px] font-bold uppercase tracking-wider" style="color: {theme.accent};">alegerea ta</span>{/if}
+								</span>
+								<span class="font-bold tabular-nums" style="color: {t.tarif ? (activ ? theme.accent : 'var(--text)') : 'var(--muted)'};">
+									{#if t.tarif}{t.tarif.toFixed(0)} lei/zi{:else}la cerere{/if}
+								</span>
+							</div>
+						{/each}
+					</div>
+				{/if}
 
 				<!-- Trust badges grid — color-coded pentru încredere -->
 				<div class="relative grid grid-cols-2 gap-2 mt-4">
@@ -663,11 +708,11 @@
 						<p class="spec-lbl">CP</p>
 					</div>
 				{/if}
-				{#if masina.km_inclusi_zi}
+				{#if masina.km_nelimitati || masina.km_inclusi_zi}
 					<div class="spec-card">
 						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-						<p class="spec-val">{masina.km_inclusi_zi}</p>
-						<p class="spec-lbl">km/zi</p>
+						<p class="spec-val">{masina.km_nelimitati ? '∞' : masina.km_inclusi_zi}</p>
+						<p class="spec-lbl">{masina.km_nelimitati ? 'km' : 'km/zi'}</p>
 					</div>
 				{/if}
 			</div>
@@ -801,7 +846,7 @@
 						</div>
 						<div class="flex justify-between">
 							<span style="color: var(--muted)">Închiriere</span>
-							<span style="color: var(--text)">{nrZile} {nrZile === 1 ? 'zi' : 'zile'} × {masina.tarif_zi.toFixed(2)} = <strong>{costMasina.toFixed(2)} lei</strong></span>
+							<span style="color: var(--text)">{nrZile} {nrZile === 1 ? 'zi' : 'zile'} × {(tarifCurent ?? 0).toFixed(2)} = <strong>{costMasina.toFixed(2)} lei</strong></span>
 						</div>
 						{#if costLocuri > 0}
 							<div class="flex justify-between">
@@ -868,7 +913,7 @@
 							</p>
 						{:else}
 							<p class="text-[11px] font-semibold uppercase tracking-wider" style="color: var(--muted)">
-								{masina.tarif_zi.toFixed(0)} lei/zi
+								{tarifAfisat ? `de la ${tarifAfisat.toFixed(0)} lei/zi` : 'tarif la cerere'}
 							</p>
 							<p class="text-sm font-medium" style="color: var(--text)">Alege intervalul</p>
 						{/if}
