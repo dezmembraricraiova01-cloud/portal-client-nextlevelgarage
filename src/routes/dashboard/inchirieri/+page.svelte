@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { api, type MasinaInchiriereCard, type LocInchiriere, type ClasaFlota } from '$lib/api';
+	import { api, type MasinaInchiriereCard, type LocInchiriere, type ClasaFlota, type PraguriPret } from '$lib/api';
 	import Skeleton from '$lib/Skeleton.svelte';
 	import CalendarInterval from '$lib/components/CalendarInterval.svelte';
 	import LocPicker from '$lib/components/LocPicker.svelte';
@@ -8,6 +8,9 @@
 	let masini       = $state<MasinaInchiriereCard[]>([]);
 	let locuri       = $state<LocInchiriere[]>([]);
 	let clase        = $state<ClasaFlota[]>([]);
+	let preturi      = $state<PraguriPret>({ min: 0, max: 0, fara_tarif: 0 });
+	/** Limita de sus aleasă de client; 0 = neatinsă, deci nu filtrează nimic. */
+	let pretMaxim    = $state(0);
 	let loading      = $state(true);
 	let error        = $state('');
 	let q            = $state('');
@@ -92,6 +95,9 @@
 				}
 				if (combust && m.combustibil !== combust) return false;
 				if (clasaAleasa && m.clasa !== clasaAleasa) return false;
+				// Mașinile fără tarif se ofertează la telefon — nu le ascundem
+				// sub o limită de preț, altfel dispare marfă din vitrină.
+				if (pretMaxim > 0 && m.tarif_zi > 0 && m.tarif_zi > pretMaxim) return false;
 				return true;
 			})
 			// disponibilele primele când avem interval
@@ -113,7 +119,12 @@
 			masini = res.masini;
 			locuri = res.locuri ?? [];
 			clase  = res.clase ?? [];
+			preturi = res.preturi ?? { min: 0, max: 0, fara_tarif: 0 };
 			intervalInfo = res.interval;
+
+			// Limita pornește sus, adică nefiltrată; o coborâm doar dacă flota s-a
+			// ieftinit sub ce alesese clientul, ca să nu rămână un ecran gol.
+			if (pretMaxim === 0 || pretMaxim > preturi.max) pretMaxim = preturi.max;
 
 			// Clasa filtrată care nu mai există în flotă ar lăsa ecranul gol fără
 			// explicație; o stingem odată cu pastila care a dispărut.
@@ -347,6 +358,31 @@
 					{c.clasa} {c.nr}
 				</button>
 			{/each}
+		</div>
+	{/if}
+
+	<!-- Limita de preț apare doar când există tarife ȘI cel puțin două valori
+	     diferite: un cursor între 300 și 300 nu filtrează nimic. -->
+	{#if !loading && preturi.max > 0 && preturi.max > preturi.min}
+		<div class="px-3 py-2.5 rounded-xl" style="background: var(--surface); border: 1px solid var(--border);">
+			<div class="flex items-baseline justify-between gap-2">
+				<span class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--muted)">Până la</span>
+				<span class="text-sm font-bold" style="color: var(--text)">{pretMaxim} lei/zi</span>
+			</div>
+			<input type="range" bind:value={pretMaxim}
+				min={preturi.min} max={preturi.max} step="10"
+				aria-label="Preț maxim pe zi"
+				class="w-full mt-1.5 cursor-pointer" style="accent-color: #eab308;" />
+			<div class="flex justify-between text-[10px]" style="color: var(--muted)">
+				<span>{preturi.min} lei</span>
+				<span>{preturi.max} lei</span>
+			</div>
+			{#if preturi.fara_tarif > 0}
+				<p class="text-[10px] mt-1 leading-snug" style="color: var(--muted)">
+					{preturi.fara_tarif}
+					{preturi.fara_tarif === 1 ? 'mașină are tariful la cerere și rămâne' : 'mașini au tariful la cerere și rămân'} în listă.
+				</p>
+			{/if}
 		</div>
 	{/if}
 
