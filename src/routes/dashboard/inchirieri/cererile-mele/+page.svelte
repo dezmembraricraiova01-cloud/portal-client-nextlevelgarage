@@ -112,6 +112,16 @@
 									<p class="text-xs mt-0.5" style="color: var(--muted)">
 										{fmtDate(c.data_start)} → {fmtDate(c.data_end)}
 									</p>
+									<!-- Locul se arată doar când nu e sediul: „Sediu → Sediu" pe fiecare
+									     rând e zgomot, iar aeroportul trebuie să sară în ochi. -->
+									{#if c.loc_preluare && (c.loc_preluare.tip !== 'sediu' || c.loc_returnare?.tip !== 'sediu')}
+										<p class="text-[11px] mt-0.5 truncate" style="color: var(--muted)">
+											📍 {c.loc_preluare.text}
+											{#if c.loc_returnare && c.loc_returnare.text !== c.loc_preluare.text}
+												→ {c.loc_returnare.text}
+											{/if}
+										</p>
+									{/if}
 								</div>
 								<span class="shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full"
 									style="background: {s.bg}; color: {s.fg}; border: 1px solid {s.border};">

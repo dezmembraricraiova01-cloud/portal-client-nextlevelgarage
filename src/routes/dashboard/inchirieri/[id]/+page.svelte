@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { api, type MasinaInchiriereDetaliu, type IntervalBlocat, type InchiriereForm, type ExtraOferit } from '$lib/api';
+	import { api, type MasinaInchiriereDetaliu, type IntervalBlocat, type InchiriereForm, type ExtraOferit, type LocInchiriere } from '$lib/api';
 	import Skeleton from '$lib/Skeleton.svelte';
 
 	let masina    = $state<MasinaInchiriereDetaliu | null>(null);
 	let blocate   = $state<IntervalBlocat[]>([]);
 	let extras    = $state<ExtraOferit[]>([]);
+	let locuri    = $state<LocInchiriere[]>([]);
 	let loading   = $state(true);
 	let loadError = $state('');
 	let pozaIdx   = $state(0);
@@ -19,6 +20,14 @@
 	let telefon        = $state('');
 	let observatii     = $state('');
 	let selectedExtras = $state<Record<string, boolean>>({});
+
+	// Locurile alese la pasul anterior, purtate în URL. Nu se pot schimba aici:
+	// se schimbă acolo unde au fost alese, ca omul să nu aibă două locuri de
+	// unde se răzgândește și niciunul care câștigă.
+	let locDeTip      = $state('sediu');
+	let locDeAdresa   = $state('');
+	let locPanaTip    = $state('sediu');
+	let locPanaAdresa = $state('');
 
 	let saving      = $state(false);
 	let formError   = $state('');
@@ -43,7 +52,21 @@
 			sum + (e.tip === 'per_zi' ? e.pret * nrZile : e.pret), 0)
 	);
 
-	let costEstimat = $derived(Math.round((costMasina + costExtras) * 100) / 100);
+	function locDupaCod(cod: string): LocInchiriere | null {
+		return locuri.find((l) => l.cod === cod) ?? null;
+	}
+
+	function etichetaLoc(cod: string, adresa: string): string {
+		if (adresa.trim()) return adresa.trim();
+
+		return locDupaCod(cod)?.label ?? 'Sediu';
+	}
+
+	// Taxa se ia o dată per capăt, nu pe zi: drumul la aeroport costă la fel
+	// indiferent câte zile stă mașina la client.
+	let costLocuri = $derived((locDupaCod(locDeTip)?.taxa ?? 0) + (locDupaCod(locPanaTip)?.taxa ?? 0));
+
+	let costEstimat = $derived(Math.round((costMasina + costExtras + costLocuri) * 100) / 100);
 
 	let intervalConflict = $derived.by(() => {
 		if (!dataStart || !dataEnd) return false;
@@ -71,9 +94,41 @@
 			masina  = res.masina;
 			blocate = res.intervale_blocate;
 			extras  = res.extras;
+			locuri  = res.locuri ?? [];
 
 			// Pre-fill date din URL params (din listing) — sare la pasul Extras
 			const params = new URLSearchParams(window.location.search);
+
+			// Locurile alese la pasul anterior. Un cod care nu mai e în catalog
+			// cade pe sediu, nu pe eroare: catalogul se poate schimba între timp.
+			const coduri = new Set(locuri.map((l) => l.cod));
+			const citesteLoc = (cheie: string) => {
+				const v = params.get(cheie);
+
+				return v && coduri.has(v) ? v : 'sediu';
+			};
+			// Un loc care cere adresă, dar vine fără ea, cade pe sediu. Altfel
+			// omul ajunge la ultimul pas cu o eroare pe un câmp care nu există
+			// pe ecranul ăsta — fundătură din care nu iese decât înapoi.
+			const asezaLoc = (cheieLoc: string, cheieAdr: string, implicit: string): [string, string] => {
+				const cod = params.has(cheieLoc) ? citesteLoc(cheieLoc) : implicit;
+				const l = locDupaCod(cod);
+				if (!l?.cere_adresa) return [cod, ''];
+
+				const adr = (params.get(cheieAdr) ?? '').trim();
+
+				return adr ? [cod, adr] : ['sediu', ''];
+			};
+
+			const de = asezaLoc('loc_de', 'adr_de', 'sediu');
+			locDeTip    = de[0];
+			locDeAdresa = de[1];
+
+			// Fără capăt separat în URL, returnarea urmează preluarea.
+			const pana = asezaLoc('loc_pana', 'adr_pana', locDeTip);
+			locPanaTip    = pana[0];
+			locPanaAdresa = pana[1];
+
 			const fromParam = params.get('from');
 			const toParam   = params.get('to');
 			if (fromParam && toParam) {
@@ -103,6 +158,10 @@
 				telefon:    telefon || undefined,
 				observatii: observatii || undefined,
 				extras:     extraseAlese.map(e => e.cod),
+				loc_preluare_tip:     locDeTip,
+				loc_preluare_adresa:  locDeAdresa || undefined,
+				loc_returnare_tip:    locPanaTip,
+				loc_returnare_adresa: locPanaAdresa || undefined,
 			};
 			await api.rezervaInchiriere(masinaId, data);
 			formSuccess = true;
@@ -527,10 +586,24 @@
 									style="color: var(--accent);">schimbă</button>
 							</span>
 						</div>
+						<div class="flex justify-between gap-3">
+							<span style="color: var(--muted)">Preluare</span>
+							<span class="text-right" style="color: var(--text)">{etichetaLoc(locDeTip, locDeAdresa)}</span>
+						</div>
+						<div class="flex justify-between gap-3">
+							<span style="color: var(--muted)">Returnare</span>
+							<span class="text-right" style="color: var(--text)">{etichetaLoc(locPanaTip, locPanaAdresa)}</span>
+						</div>
 						<div class="flex justify-between">
 							<span style="color: var(--muted)">Închiriere</span>
 							<span style="color: var(--text)">{nrZile} {nrZile === 1 ? 'zi' : 'zile'} × {masina.tarif_zi.toFixed(2)} = <strong>{costMasina.toFixed(2)} lei</strong></span>
 						</div>
+						{#if costLocuri > 0}
+							<div class="flex justify-between">
+								<span style="color: var(--muted)">Taxă preluare / returnare</span>
+								<span style="color: var(--text)">{costLocuri.toFixed(2)} lei</span>
+							</div>
+						{/if}
 						{#if extraseAlese.length > 0}
 							<div class="pt-1.5 mt-1.5 border-t" style="border-color: var(--border);">
 								<p class="text-[11px] font-semibold uppercase tracking-wider mb-1" style="color: var(--muted)">Extras</p>
