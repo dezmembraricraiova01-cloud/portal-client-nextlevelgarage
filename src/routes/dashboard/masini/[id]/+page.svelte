@@ -4,6 +4,23 @@
 	import { api, type Masina, type WoSummary, type MasinaFoto, type AlertaMasina, type AlertSummary } from '$lib/api';
 	import Skeleton from '$lib/Skeleton.svelte';
 	import AlertDocumentCard from '$lib/components/alerts/AlertDocumentCard.svelte';
+	import IncarcaAct from '$lib/components/IncarcaAct.svelte';
+
+	// Actele pe care le poate încărca clientul. Primele patru poartă dată de
+	// expirare — ea aprinde alertele; ultimele trei intră doar ca fișier, fiindcă
+	// la mașina de client nu există unde să stea valabilitatea lor.
+	const ACTE_MASINA = [
+		{ tip: 'itp',         eticheta: 'ITP',                  descriere: 'Cu data până când e valabil.', cuData: true },
+		{ tip: 'rca',         eticheta: 'RCA',                  descriere: 'Cu data până când e valabilă.', cuData: true },
+		{ tip: 'casco',       eticheta: 'CASCO',                descriere: 'Opțional, dacă ai.',            cuData: true },
+		{ tip: 'rovinieta',   eticheta: 'Rovinietă',            descriere: 'Doar fișierul.',                cuData: false },
+		{ tip: 'talon',       eticheta: 'Talon',                descriere: 'Certificatul de înmatriculare.', cuData: false },
+		{ tip: 'civ',         eticheta: 'CIV',                  descriere: 'Cartea de identitate a mașinii.', cuData: false }
+	];
+
+	// Data o cere componenta, printr-un câmp propriu — vezi `cereData`.
+	const trimiteAct = (tip: string, fisier: File, valabilPana?: string) =>
+		api.uploadActMasina(id, { tip, fisier, valabil_pana: valabilPana });
 
 	const id = $derived(Number(page.params.id));
 	let masina    = $state<Masina | null>(null);
@@ -351,6 +368,29 @@
 					onToggleActiva={handleToggleActiva}
 				/>
 			{/if}
+
+		<!-- Actele mașinii — încărcate de client, verificate de noi -->
+		<section class="mb-6">
+			<h2 class="text-xs font-semibold uppercase tracking-widest mb-3" style="color: var(--muted)">
+				Actele mașinii
+			</h2>
+
+			<div class="space-y-1.5">
+				{#each ACTE_MASINA as act (act.tip)}
+					<IncarcaAct
+						eticheta={act.eticheta}
+						descriere={act.descriere}
+						cereData={act.cuData}
+						incarca={(fisier, valabilPana) => trimiteAct(act.tip, fisier, valabilPana)}
+					/>
+				{/each}
+			</div>
+
+			<p class="text-[11px] mt-2.5" style="color: var(--muted)">
+				Pentru ITP, RCA, CASCO și carte verde îți cerem și data până la care sunt valabile,
+				ca să te anunțăm înainte să expire.
+			</p>
+		</section>
 
 		<!-- Poze mașină -->
 		<section>

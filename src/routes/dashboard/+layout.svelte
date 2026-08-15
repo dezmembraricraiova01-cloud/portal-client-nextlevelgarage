@@ -290,13 +290,16 @@
 					</div>
 				{/if}
 				{#if client.ci_lipsa || client.permis_lipsa}
-					<div class="flex items-center gap-3">
+					<!-- Duce în profil, unde actele se pot chiar încărca. Până acum
+					     anunța lipsa fără să spună ce e de făcut. -->
+					<a href="/dashboard/profil" onclick={dismissToast} class="flex items-center gap-3" style="text-decoration: none;">
 						<span class="text-base shrink-0">📋</span>
 						<p class="text-xs flex-1" style="color: #eab308">
 							Dosar incomplet:
 							{#if client.ci_lipsa}CI lipsă{/if}{#if client.ci_lipsa && client.permis_lipsa} · {/if}{#if client.permis_lipsa}Permis lipsă{/if}
+							<span class="font-semibold"> — adaugă acum ›</span>
 						</p>
-					</div>
+					</a>
 				{/if}
 				<div class="flex items-center justify-between pt-1">
 					<a href="/dashboard/remindere" onclick={dismissToast}
