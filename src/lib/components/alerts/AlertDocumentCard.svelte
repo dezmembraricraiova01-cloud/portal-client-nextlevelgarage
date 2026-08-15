@@ -4,6 +4,7 @@
 	import AlertRecommendation from './AlertRecommendation.svelte';
 	import AlertManualOnlyHint from './AlertManualOnlyHint.svelte';
 	import { getSeverityCopy } from '$lib/alerts/alert-copy';
+	import CalendarModal from '../CalendarModal.svelte';
 	import { EMOJI_SUGGESTII } from '$lib/alerts/emoji-palette';
 
 	const THRESHOLD_OPTIONS = [
@@ -91,6 +92,10 @@
 	}
 
 	let editData = $state(existingData);
+	let calendarDeschis = $state(false);
+
+	// Pe ecran data se citește românește; în cerere pleacă tot an-lună-zi.
+	const dataAfisata = $derived(editData ? editData.split('-').reverse().join('.') : '');
 	let editZile = $state(existingZile);
 
 	// Mod "multiplu" — bifat dacă alerta existentă are thresholds setate
@@ -238,9 +243,17 @@
 
 	<div>
 		<label class="text-xs mb-1.5 block" style="color: var(--muted)">Data expirare</label>
-		<input type="date" bind:value={editData}
-			class="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-			style="background: var(--surface2); border: 1px solid var(--border); color: var(--text);" />
+		<button
+			type="button"
+			onclick={() => (calendarDeschis = true)}
+			class="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm outline-none transition-opacity active:scale-[0.99]"
+			style="background: var(--surface2); border: 1px solid {editData ? 'var(--accent)' : 'var(--border)'}; color: var(--text);"
+		>
+			<span style="color: {editData ? 'var(--text)' : 'var(--muted)'}">
+				{editData ? dataAfisata : 'Alege data'}
+			</span>
+			<span style="color: var(--muted)">📅</span>
+		</button>
 	</div>
 
 	<!-- Mod notificare: simplu (zile_inainte) sau multiplu (thresholds) -->
@@ -321,3 +334,13 @@
 		</button>
 	</div>
 </div>
+
+<!-- Fără dată minimă: aici se poate înregistra și un act deja expirat, iar
+     alerta trebuie să spună asta, nu să refuze data. -->
+<CalendarModal
+	bind:deschis={calendarDeschis}
+	bind:valoare={editData}
+	titlu="Data expirării"
+	subtitlu={docLabel}
+	minim=""
+/>

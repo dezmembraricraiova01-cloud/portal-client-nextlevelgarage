@@ -11,6 +11,8 @@
 	 * ca omul să nu creadă că dosarul lui e gata.
 	 */
 
+	import CalendarModal from './CalendarModal.svelte';
+
 	let {
 		eticheta,
 		descriere = '',
@@ -32,7 +34,13 @@
 	let stare = $state<'liber' | 'trimite' | 'gata' | 'eroare'>(gata ? 'gata' : 'liber');
 	let mesaj = $state('');
 	let dataPana = $state('');
+	let calendarDeschis = $state(false);
 	let input: HTMLInputElement | undefined = $state();
+
+	// Afișăm data pe românește; în cerere pleacă tot formatul an-lună-zi.
+	const dataAfisata = $derived(
+		dataPana ? dataPana.split('-').reverse().join('.') : ''
+	);
 
 	// Fără dată, serverul respinge cu 422 și omul nu înțelege de ce — așa că
 	// butonul stă blocat până o completează.
@@ -93,16 +101,17 @@
 	</div>
 
 	{#if cereData && stare !== 'gata'}
-		<label class="flex items-center gap-2 mt-2.5">
-			<span class="shrink-0 text-[11px]" style="color: var(--muted)">Valabil până la</span>
-			<input
-				type="date"
-				bind:value={dataPana}
-				min={azi}
-				class="flex-1 px-2.5 py-1.5 rounded-lg text-[11px] outline-none"
-				style="background: var(--surface2); border: 1px solid {dataPana ? '#eab30860' : 'var(--border)'}; color: var(--text);"
-			/>
-		</label>
+		<button
+			type="button"
+			onclick={() => (calendarDeschis = true)}
+			class="w-full flex items-center justify-between gap-2 mt-2.5 px-2.5 py-2 rounded-lg text-[11px] transition-opacity active:scale-[0.99]"
+			style="background: var(--surface2); border: 1px solid {dataPana ? '#eab30860' : 'var(--border)'}; color: var(--text);"
+		>
+			<span style="color: var(--muted)">Valabil până la</span>
+			<span class="font-semibold" style="color: {dataPana ? '#eab308' : 'var(--muted)'}">
+				{dataPana ? dataAfisata : 'alege data ›'}
+			</span>
+		</button>
 	{/if}
 
 	<input
@@ -115,3 +124,11 @@
 		aria-label={eticheta}
 	/>
 </div>
+
+<CalendarModal
+	bind:deschis={calendarDeschis}
+	bind:valoare={dataPana}
+	titlu="Până când e valabil?"
+	subtitlu={eticheta}
+	minim={azi}
+/>
