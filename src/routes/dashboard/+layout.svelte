@@ -66,6 +66,27 @@
 		return () => destroySmooth();
 	});
 
+	// Înălțimea REALĂ a navigației de jos, publicată ca `--nav-h`.
+	//
+	// Barele de acțiune ale paginilor (rezervare, deviz) stăteau pe o valoare
+	// ghicită, 64px, iar butoanele intrau sub navigație. Înălțimea depinde de
+	// font, de zona sigură a telefonului și de câte iconițe are meniul — deci se
+	// măsoară, nu se presupune. ResizeObserver o ține corectă și la rotire.
+	let navEl: HTMLElement | undefined = $state();
+
+	$effect(() => {
+		if (!navEl) return;
+
+		const scrie = () =>
+			document.documentElement.style.setProperty('--nav-h', `${navEl!.offsetHeight}px`);
+
+		scrie();
+		const ro = new ResizeObserver(scrie);
+		ro.observe(navEl);
+
+		return () => ro.disconnect();
+	});
+
 	onMount(async () => {
 		auth.restore();
 		try {
@@ -627,7 +648,7 @@
 	<HelpButton />
 
 	<!-- Bottom Nav -->
-	<nav data-tour="nav" class="fixed bottom-0 left-0 right-0 z-50 border-t flex"
+	<nav bind:this={navEl} data-tour="nav" class="fixed bottom-0 left-0 right-0 z-50 border-t flex"
 		style="background: var(--surface); border-color: var(--border);">
 		{#each navItems as item}
 			<a href={item.href}

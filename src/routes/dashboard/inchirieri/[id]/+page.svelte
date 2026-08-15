@@ -132,7 +132,8 @@
 	onMount(load);
 </script>
 
-<div class="space-y-4 pb-32">
+<!-- Spatiu cat navigatia PLUS bara de actiune, ca ultimul rand sa nu ramana dedesubt. -->
+<div class="space-y-4" style="padding-bottom: calc(var(--nav-h, 64px) + 96px);">
 	<a href="/dashboard/inchirieri" class="inline-flex items-center gap-1.5 text-xs font-semibold"
 		style="color: var(--muted); text-decoration: none;">← Înapoi la flotă</a>
 
@@ -671,8 +672,11 @@
 
 	.sticky-action {
 		position: fixed;
-		left: 0; right: 0; bottom: 64px; /* deasupra bottom-nav-ului */
-		z-index: 30;
+		left: 0; right: 0;
+		/* Înălțimea reală a navigației, măsurată în layout — nu o valoare ghicită.
+		   Cu 64px fix, butonul intra sub meniu pe ecranele unde nav-ul e mai înalt. */
+		bottom: var(--nav-h, 64px);
+		z-index: 40;
 		padding: 8px 16px 12px;
 		background: linear-gradient(180deg, transparent 0%, rgba(13,13,34,0.85) 30%, rgba(13,13,34,0.98) 100%);
 		backdrop-filter: blur(10px);
@@ -690,9 +694,8 @@
 		box-shadow: 0 -4px 24px -8px rgba(0,0,0,0.5);
 	}
 
-	@media (min-width: 640px) {
-		.sticky-action { bottom: 0; }
-	}
+	/* Pe lat NU coborâm bara la 0: navigația de jos rămâne vizibilă și acolo,
+	   iar regula asta o băga fix sub meniu — de-acolo veneau butoanele tăiate. */
 
 	/* HERO grid: pe wide screens, foto + tarif card alături */
 	.hero-grid {
