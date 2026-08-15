@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { EMOJI_SUGGESTII } from '$lib/alerts/emoji-palette';
+	import CalendarModal from '../CalendarModal.svelte';
 
 	const THRESHOLD_OPTIONS = [
 		{ value: 30, label: '30 zile înainte' },
@@ -24,6 +25,10 @@
 	let label          = $state('');
 	let icon           = $state('🔔');
 	let data           = $state('');
+	let calendarDeschis = $state(false);
+
+	// Pe ecran românește, în cerere tot an-lună-zi.
+	const dataAfisata = $derived(data ? data.split('-').reverse().join('.') : '');
 	let zile           = $state(30);
 	let useMultiple    = $state(false);
 	let thresholds     = $state<number[]>([]);
@@ -100,9 +105,17 @@
 
 	<div>
 		<label class="text-xs mb-1.5 block" style="color: var(--muted)">Data expirare</label>
-		<input type="date" bind:value={data}
-			class="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-			style="background: var(--surface2); border: 1px solid var(--border); color: var(--text);" />
+		<button
+			type="button"
+			onclick={() => (calendarDeschis = true)}
+			class="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm outline-none transition-opacity active:scale-[0.99]"
+			style="background: var(--surface2); border: 1px solid {data ? 'var(--accent)' : 'var(--border)'}; color: var(--text);"
+		>
+			<span style="color: {data ? 'var(--text)' : 'var(--muted)'}">
+				{data ? dataAfisata : 'Alege data'}
+			</span>
+			<span style="color: var(--muted)">📅</span>
+		</button>
 	</div>
 
 	<div class="space-y-2">
@@ -175,3 +188,12 @@
 		</button>
 	</div>
 </div>
+
+<!-- Alerta personala poate privi si ceva deja expirat — nu blocam datele trecute. -->
+<CalendarModal
+	bind:deschis={calendarDeschis}
+	bind:valoare={data}
+	titlu="Data expirării"
+	subtitlu={label || 'Alertă nouă'}
+	minim=""
+/>
