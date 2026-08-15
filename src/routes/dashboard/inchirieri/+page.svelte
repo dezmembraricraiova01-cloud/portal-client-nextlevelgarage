@@ -1,21 +1,73 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { api, type MasinaInchiriereCard } from '$lib/api';
+	import { api, type MasinaInchiriereCard, type LocInchiriere, type ClasaFlota } from '$lib/api';
 	import Skeleton from '$lib/Skeleton.svelte';
+	import CalendarInterval from '$lib/components/CalendarInterval.svelte';
+	import LocPicker from '$lib/components/LocPicker.svelte';
 
 	let masini       = $state<MasinaInchiriereCard[]>([]);
+	let locuri       = $state<LocInchiriere[]>([]);
+	let clase        = $state<ClasaFlota[]>([]);
 	let loading      = $state(true);
 	let error        = $state('');
 	let q            = $state('');
 	let combust      = $state('');
+	let clasaAleasa  = $state('');
 
 	// Date selection (înainte de a alege mașina)
 	let dataStart    = $state('');
 	let dataEnd      = $state('');
 	let intervalInfo = $state<{ from: string; to: string; zile: number } | null>(null);
+	let calendarDeschis = $state(false);
 
-	const today   = new Date().toISOString().slice(0, 10);
-	const maxDate = new Date(Date.now() + 180 * 86_400_000).toISOString().slice(0, 10);
+	// Locurile celor două capete. Returnarea urmează tăcut preluarea până când
+	// clientul cere altfel: cei mai mulți aduc mașina de unde au luat-o, iar o
+	// a doua alegere identică e muncă degeaba pentru toți.
+	let locDeTip       = $state('sediu');
+	let locDeAdresa    = $state('');
+	let locPanaTip     = $state('sediu');
+	let locPanaAdresa  = $state('');
+	let altLoc         = $state(false);
+	let pickerDe       = $state(false);
+	let pickerPana     = $state(false);
+
+	function locDupaCod(cod: string): LocInchiriere | null {
+		return locuri.find((l) => l.cod === cod) ?? null;
+	}
+
+	function etichetaLoc(cod: string, adresa: string): string {
+		if (adresa.trim()) return adresa.trim();
+
+		return locDupaCod(cod)?.label ?? 'Sediu';
+	}
+
+	// Ambele capete, întotdeauna. Când returnarea urmează preluarea, tot două
+	// drumuri face șoferul, iar serverul taxează amândouă — o bară care arată
+	// jumătate din ce se încasează e mai rea decât una care nu arată nimic.
+	let taxaLoc = $derived(
+		(locDupaCod(locDeTip)?.taxa ?? 0) + (locDupaCod(locPanaTip)?.taxa ?? 0)
+	);
+
+	function comutaAltLoc() {
+		altLoc = !altLoc;
+		if (!altLoc) {
+			locPanaTip = locDeTip;
+			locPanaAdresa = locDeAdresa;
+		}
+	}
+
+	// Cât timp returnarea nu e separată, ea urmează preluarea.
+	$effect(() => {
+		if (altLoc) return;
+		locPanaTip = locDeTip;
+		locPanaAdresa = locDeAdresa;
+	});
+
+	function dataScurta(cod: string): string {
+		return new Date(cod + 'T00:00:00').toLocaleDateString('ro-RO', {
+			day: 'numeric', month: 'short', year: 'numeric'
+		});
+	}
 
 	let nrZile = $derived.by(() => {
 		if (!dataStart || !dataEnd) return 0;
@@ -39,6 +91,7 @@
 					if (!`${m.marca} ${m.model}`.toLowerCase().includes(t)) return false;
 				}
 				if (combust && m.combustibil !== combust) return false;
+				if (clasaAleasa && m.clasa !== clasaAleasa) return false;
 				return true;
 			})
 			// disponibilele primele când avem interval
@@ -58,7 +111,13 @@
 				intervalValid ? { from: dataStart, to: dataEnd } : undefined
 			);
 			masini = res.masini;
+			locuri = res.locuri ?? [];
+			clase  = res.clase ?? [];
 			intervalInfo = res.interval;
+
+			// Clasa filtrată care nu mai există în flotă ar lăsa ecranul gol fără
+			// explicație; o stingem odată cu pastila care a dispărut.
+			if (clasaAleasa && !clase.some((c) => c.clasa === clasaAleasa)) clasaAleasa = '';
 		} catch (e: any) {
 			error = e.message ?? 'Eroare la încărcarea flotei.';
 		} finally {
@@ -74,10 +133,25 @@
 		refetchTimer = setTimeout(() => loadFlota(), 250) as unknown as number;
 	});
 
-	// URL pentru cardul mașinii — include datele dacă au fost alese
+	// URL pentru cardul mașinii — duce mai departe datele și locurile alese aici,
+	// ca pasul următor să nu întrebe din nou ce s-a răspuns deja.
 	function carUrl(id: number): string {
 		if (!intervalValid) return `/dashboard/inchirieri/${id}`;
-		return `/dashboard/inchirieri/${id}?from=${dataStart}&to=${dataEnd}`;
+
+		const p = new URLSearchParams({ from: dataStart, to: dataEnd });
+		if (locDeTip !== 'sediu' || locDeAdresa) {
+			p.set('loc_de', locDeTip);
+			if (locDeAdresa) p.set('adr_de', locDeAdresa);
+		}
+		// Capătul separat se scrie ÎNTOTDEAUNA când e desfăcut, chiar dacă e
+		// sediul: fără el, pasul următor deduce că returnarea urmează preluarea
+		// și trimite omul la aeroport după ce el ceruse întoarcerea la sediu.
+		if (altLoc) {
+			p.set('loc_pana', locPanaTip);
+			if (locPanaAdresa) p.set('adr_pana', locPanaAdresa);
+		}
+
+		return `/dashboard/inchirieri/${id}?${p.toString()}`;
 	}
 
 	// Theming inteligent pe categorie — accent + gradient placeholder
@@ -166,29 +240,115 @@
 			{/if}
 		</div>
 
-		<div class="grid grid-cols-2 gap-2">
-			<div>
-				<label for="ds" class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--muted)">Ridicare</label>
-				<input id="ds" type="date" bind:value={dataStart}
-					min={today} max={maxDate}
-					class="w-full mt-1 text-sm px-3 py-2.5 rounded-xl"
-					style="background: var(--surface); border: 1px solid var(--border); color: var(--text);" />
-			</div>
-			<div>
-				<label for="de" class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--muted)">Returnare</label>
-				<input id="de" type="date" bind:value={dataEnd}
-					min={dataStart || today} max={maxDate}
-					class="w-full mt-1 text-sm px-3 py-2.5 rounded-xl"
-					style="background: var(--surface); border: 1px solid var(--border); color: var(--text);" />
-			</div>
+		<!-- Un singur calendar pentru ambele capete: două selectoare separate nu
+		     știu unul de altul și nu pot stinge zilele deja rezervate. -->
+		<button type="button" onclick={() => (calendarDeschis = true)}
+			class="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left active:scale-[0.99] transition-transform"
+			style="background: var(--surface); border: 1.5px solid {intervalValid ? '#eab308' : 'var(--border)'}; color: var(--text);">
+			<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color: var(--muted); flex: none;"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>
+			{#if intervalValid}
+				<span class="text-sm font-semibold truncate">{dataScurta(dataStart)} → {dataScurta(dataEnd)}</span>
+			{:else}
+				<span class="text-sm" style="color: var(--muted)">Alege zilele</span>
+			{/if}
+			<span class="ml-auto text-xs shrink-0" style="color: var(--muted)">▾</span>
+		</button>
+
+		<!-- Locurile celor două capete -->
+		<div class="mt-2 space-y-2">
+			<button type="button" onclick={() => (pickerDe = true)}
+				class="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left active:scale-[0.99] transition-transform"
+				style="background: var(--surface); border: 1px solid var(--border); color: var(--text);">
+				<span class="text-[10px] font-bold uppercase tracking-wider shrink-0" style="color: var(--muted)">Iau din</span>
+				<span class="text-sm font-semibold truncate">{etichetaLoc(locDeTip, locDeAdresa)}</span>
+				{#if (locDupaCod(locDeTip)?.taxa ?? 0) > 0}
+					<span class="ml-auto text-[11px] font-bold shrink-0" style="color: #eab308">+{locDupaCod(locDeTip)?.taxa} lei</span>
+				{:else}
+					<span class="ml-auto text-xs shrink-0" style="color: var(--muted)">▾</span>
+				{/if}
+			</button>
+
+			{#if altLoc}
+				<button type="button" onclick={() => (pickerPana = true)}
+					class="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left active:scale-[0.99] transition-transform"
+					style="background: var(--surface); border: 1px solid var(--border); color: var(--text);">
+					<span class="text-[10px] font-bold uppercase tracking-wider shrink-0" style="color: var(--muted)">Aduc la</span>
+					<span class="text-sm font-semibold truncate">{etichetaLoc(locPanaTip, locPanaAdresa)}</span>
+					{#if (locDupaCod(locPanaTip)?.taxa ?? 0) > 0}
+						<span class="ml-auto text-[11px] font-bold shrink-0" style="color: #eab308">+{locDupaCod(locPanaTip)?.taxa} lei</span>
+					{:else}
+						<span class="ml-auto text-xs shrink-0" style="color: var(--muted)">▾</span>
+					{/if}
+				</button>
+			{/if}
+
+			<button type="button" onclick={comutaAltLoc} aria-pressed={altLoc}
+				class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors"
+				style="background: transparent; color: {altLoc ? 'var(--text)' : 'var(--muted)'};
+				       border: 1px {altLoc ? 'solid #eab308' : 'dashed var(--border)'};">
+				<span class="w-3 h-3 rounded-full shrink-0"
+					style="background: {altLoc ? '#eab308' : 'transparent'}; border: 1.5px solid {altLoc ? '#eab308' : 'var(--muted)'};"></span>
+				Aduc mașina în alt loc
+			</button>
 		</div>
+
+		{#if taxaLoc > 0}
+			<p class="text-[11px] mt-2 leading-snug" style="color: var(--muted)">
+				Taxă de preluare și returnare: <b style="color: #eab308">{taxaLoc} lei</b> — o singură dată, se adaugă la total.
+			</p>
+		{/if}
 
 		{#if !intervalValid}
 			<p class="text-[11px] mt-2 leading-snug" style="color: var(--muted)">
-				💡 Alege datele ca să filtrezi mașinile libere și să blochezi prețul vizibil acum.
+				💡 Alege zilele ca să filtrezi mașinile libere și să vezi prețul total.
 			</p>
 		{/if}
 	</div>
+
+	<CalendarInterval bind:deschis={calendarDeschis} bind:de={dataStart} bind:pana={dataEnd} />
+
+	<!-- Două instanțe, nu una cu ținta comutată: `bind:` leagă o variabilă, nu o
+	     expresie, iar un capăt scris peste celălalt e exact greșeala de evitat. -->
+	<LocPicker
+		bind:deschis={pickerDe}
+		bind:tip={locDeTip}
+		bind:adresa={locDeAdresa}
+		{locuri}
+		titlu="De unde iei mașina?"
+	/>
+
+	<LocPicker
+		bind:deschis={pickerPana}
+		bind:tip={locPanaTip}
+		bind:adresa={locPanaAdresa}
+		{locuri}
+		titlu="Unde o aduci înapoi?"
+	/>
+
+	<!-- Clasele vin numărate din flotă, nu dintr-o listă scrisă de mână: o pastilă
+	     care nu returnează nimic e mai rea decât lipsa ei. -->
+	{#if !loading && clase.length > 1}
+		<div class="flex flex-wrap items-center gap-1.5">
+			<button type="button" onclick={() => (clasaAleasa = '')}
+				class="px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors"
+				style="background: {clasaAleasa === '' ? '#eab308' : 'var(--surface)'};
+				       color: {clasaAleasa === '' ? '#1a1a1a' : 'var(--muted)'};
+				       border: 1px solid {clasaAleasa === '' ? '#eab308' : 'var(--border)'};">
+				Toate {masini.length}
+			</button>
+
+			{#each clase as c (c.clasa)}
+				{@const activ = clasaAleasa === c.clasa}
+				<button type="button" onclick={() => (clasaAleasa = activ ? '' : c.clasa)}
+					class="px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors"
+					style="background: {activ ? '#eab308' : 'var(--surface)'};
+					       color: {activ ? '#1a1a1a' : 'var(--muted)'};
+					       border: 1px solid {activ ? '#eab308' : 'var(--border)'};">
+					{c.clasa} {c.nr}
+				</button>
+			{/each}
+		</div>
+	{/if}
 
 	<!-- Filters -->
 	{#if !loading && masini.length > 0}

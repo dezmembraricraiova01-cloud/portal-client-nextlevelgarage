@@ -284,12 +284,20 @@ export const api = {
 		if (filters?.from)        qs.set('from', filters.from);
 		if (filters?.to)          qs.set('to', filters.to);
 		const query = qs.toString();
-		return priv<{ masini: MasinaInchiriereCard[]; interval: { from: string; to: string; zile: number } | null }>(
-			'GET', `/inchirieri/flota${query ? `?${query}` : ''}`);
+		return priv<{
+			masini:   MasinaInchiriereCard[];
+			locuri:   LocInchiriere[];
+			clase:    ClasaFlota[];
+			interval: { from: string; to: string; zile: number } | null;
+		}>('GET', `/inchirieri/flota${query ? `?${query}` : ''}`);
 	},
 	inchiriereMasina: (masinaId: number) =>
-		priv<{ masina: MasinaInchiriereDetaliu; intervale_blocate: IntervalBlocat[]; extras: ExtraOferit[] }>(
-			'GET', `/inchirieri/flota/${masinaId}`),
+		priv<{
+			masina: MasinaInchiriereDetaliu;
+			intervale_blocate: IntervalBlocat[];
+			extras: ExtraOferit[];
+			locuri: LocInchiriere[];
+		}>('GET', `/inchirieri/flota/${masinaId}`),
 	inchirieriCereri: () =>
 		priv<{ cereri: InchiriereCerere[] }>('GET', '/inchirieri/cereri'),
 	rezervaInchiriere: (masinaId: number, data: InchiriereForm) =>
@@ -1018,6 +1026,35 @@ export interface InchiriereForm {
 	telefon?:   string;
 	observatii?: string;
 	extras?:    string[];
+	loc_preluare_tip?:     string;
+	loc_preluare_adresa?:  string;
+	loc_returnare_tip?:    string;
+	loc_returnare_adresa?: string;
+}
+
+/** Un loc de preluare sau de returnare, cu taxa lui. Catalogul vine din DB. */
+export interface LocInchiriere {
+	cod:         string;
+	label:       string;
+	descriere:   string;
+	/** Taxă o singură dată per capăt, nu pe zi. */
+	taxa:        number;
+	cere_adresa: boolean;
+	icon:        string;
+}
+
+/** O clasă din flotă și câte mașini are — ca filtrul să nu ofere pastile goale. */
+export interface ClasaFlota {
+	clasa: string;
+	nr:    number;
+}
+
+/** Locul unei cereri, gata de afișat. */
+export interface LocCerere {
+	tip:    string;
+	label:  string;
+	adresa: string | null;
+	text:   string;
 }
 
 export interface ExtraOferit {
@@ -1048,6 +1085,9 @@ export interface InchiriereCerere {
 	cost_estimat:     number;
 	extras:           ExtraSelectat[];
 	extras_total:     number;
+	taxa_loc:         number;
+	loc_preluare:     LocCerere;
+	loc_returnare:    LocCerere;
 	telefon:          string;
 	observatii:       string | null;
 	motiv_respingere: string | null;
