@@ -26,8 +26,10 @@
 	// unde se răzgândește și niciunul care câștigă.
 	let locDeTip      = $state('sediu');
 	let locDeAdresa   = $state('');
+	let locDeUat      = $state(0);
 	let locPanaTip    = $state('sediu');
 	let locPanaAdresa = $state('');
+	let locPanaUat    = $state(0);
 
 	let saving      = $state(false);
 	let formError   = $state('');
@@ -56,15 +58,27 @@
 		return locuri.find((l) => l.cod === cod) ?? null;
 	}
 
-	function etichetaLoc(cod: string, adresa: string): string {
-		if (adresa.trim()) return adresa.trim();
+	function etichetaLoc(cod: string, adresa: string, uat = 0): string {
+		const loc = locDupaCod(cod);
+		const localitate = loc?.localitati.find((l) => l.id === uat);
 
-		return locDupaCod(cod)?.label ?? 'Sediu';
+		if (adresa.trim()) return localitate ? `${adresa.trim()}, ${localitate.nume}` : adresa.trim();
+
+		return localitate ? `${loc?.label} · ${localitate.nume}` : (loc?.label ?? 'Sediu');
+	}
+
+	/** Cât costă un capăt: prețul localității când se plătește pe km, altfel taxa fixă. */
+	function taxaCapat(cod: string, uat: number): number {
+		const loc = locDupaCod(cod);
+		if (!loc) return 0;
+		if (!loc.cere_localitate) return loc.taxa;
+
+		return loc.localitati.find((l) => l.id === uat)?.pret ?? 0;
 	}
 
 	// Taxa se ia o dată per capăt, nu pe zi: drumul la aeroport costă la fel
 	// indiferent câte zile stă mașina la client.
-	let costLocuri = $derived((locDupaCod(locDeTip)?.taxa ?? 0) + (locDupaCod(locPanaTip)?.taxa ?? 0));
+	let costLocuri = $derived(taxaCapat(locDeTip, locDeUat) + taxaCapat(locPanaTip, locPanaUat));
 
 	let costEstimat = $derived(Math.round((costMasina + costExtras + costLocuri) * 100) / 100);
 
@@ -110,24 +124,35 @@
 			// Un loc care cere adresă, dar vine fără ea, cade pe sediu. Altfel
 			// omul ajunge la ultimul pas cu o eroare pe un câmp care nu există
 			// pe ecranul ăsta — fundătură din care nu iese decât înapoi.
-			const asezaLoc = (cheieLoc: string, cheieAdr: string, implicit: string): [string, string] => {
+			const asezaLoc = (
+				cheieLoc: string, cheieAdr: string, cheieUat: string, implicit: string, implicitUat = 0
+			): [string, string, number] => {
 				const cod = params.has(cheieLoc) ? citesteLoc(cheieLoc) : implicit;
 				const l = locDupaCod(cod);
-				if (!l?.cere_adresa) return [cod, ''];
+				if (!l?.cere_adresa) return [cod, '', 0];
 
 				const adr = (params.get(cheieAdr) ?? '').trim();
+				if (!adr) return ['sediu', '', 0];
 
-				return adr ? [cod, adr] : ['sediu', ''];
+				if (!l.cere_localitate) return [cod, adr, 0];
+
+				// Localitatea trebuie să fie una pe care chiar o servim; altfel
+				// prețul n-ar exista, iar serverul ar refuza cererea la final.
+				const uat = params.has(cheieUat) ? Number(params.get(cheieUat)) : implicitUat;
+
+				return l.localitati.some((x) => x.id === uat) ? [cod, adr, uat] : ['sediu', '', 0];
 			};
 
-			const de = asezaLoc('loc_de', 'adr_de', 'sediu');
+			const de = asezaLoc('loc_de', 'adr_de', 'uat_de', 'sediu');
 			locDeTip    = de[0];
 			locDeAdresa = de[1];
+			locDeUat    = de[2];
 
 			// Fără capăt separat în URL, returnarea urmează preluarea.
-			const pana = asezaLoc('loc_pana', 'adr_pana', locDeTip);
+			const pana = asezaLoc('loc_pana', 'adr_pana', 'uat_pana', locDeTip, locDeUat);
 			locPanaTip    = pana[0];
 			locPanaAdresa = pana[1];
+			locPanaUat    = pana[2];
 
 			const fromParam = params.get('from');
 			const toParam   = params.get('to');
@@ -160,8 +185,10 @@
 				extras:     extraseAlese.map(e => e.cod),
 				loc_preluare_tip:     locDeTip,
 				loc_preluare_adresa:  locDeAdresa || undefined,
+				loc_preluare_localitate_id:  locDeUat || undefined,
 				loc_returnare_tip:    locPanaTip,
 				loc_returnare_adresa: locPanaAdresa || undefined,
+				loc_returnare_localitate_id: locPanaUat || undefined,
 			};
 			await api.rezervaInchiriere(masinaId, data);
 			formSuccess = true;
@@ -588,11 +615,11 @@
 						</div>
 						<div class="flex justify-between gap-3">
 							<span style="color: var(--muted)">Preluare</span>
-							<span class="text-right" style="color: var(--text)">{etichetaLoc(locDeTip, locDeAdresa)}</span>
+							<span class="text-right" style="color: var(--text)">{etichetaLoc(locDeTip, locDeAdresa, locDeUat)}</span>
 						</div>
 						<div class="flex justify-between gap-3">
 							<span style="color: var(--muted)">Returnare</span>
-							<span class="text-right" style="color: var(--text)">{etichetaLoc(locPanaTip, locPanaAdresa)}</span>
+							<span class="text-right" style="color: var(--text)">{etichetaLoc(locPanaTip, locPanaAdresa, locPanaUat)}</span>
 						</div>
 						<div class="flex justify-between">
 							<span style="color: var(--muted)">Închiriere</span>

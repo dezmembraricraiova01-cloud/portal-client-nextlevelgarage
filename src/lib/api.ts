@@ -1031,6 +1031,8 @@ export interface InchiriereForm {
 	loc_preluare_adresa?:  string;
 	loc_returnare_tip?:    string;
 	loc_returnare_adresa?: string;
+	loc_preluare_localitate_id?:  number;
+	loc_returnare_localitate_id?: number;
 }
 
 /** Un loc de preluare sau de returnare, cu taxa lui. Catalogul vine din DB. */
@@ -1041,7 +1043,20 @@ export interface LocInchiriere {
 	/** Taxă o singură dată per capăt, nu pe zi. */
 	taxa:        number;
 	cere_adresa: boolean;
+	/** Locul se plătește pe km, deci cere o localitate din nomenclator. */
+	cere_localitate: boolean;
 	icon:        string;
+	/** Localitățile servite, cu prețul deja calculat pe server. */
+	localitati:  LocalitateServita[];
+}
+
+/** O localitate în care livrăm, cu distanța și prețul ei gata socotit. */
+export interface LocalitateServita {
+	id:    number;
+	nume:  string;
+	judet: string | null;
+	km:    number;
+	pret:  number;
 }
 
 /** O clasă din flotă și câte mașini are — ca filtrul să nu ofere pastile goale. */
@@ -1060,10 +1075,11 @@ export interface PraguriPret {
 
 /** Locul unei cereri, gata de afișat. */
 export interface LocCerere {
-	tip:    string;
-	label:  string;
-	adresa: string | null;
-	text:   string;
+	tip:        string;
+	label:      string;
+	adresa:     string | null;
+	localitate: string | null;
+	text:       string;
 }
 
 export interface ExtraOferit {
