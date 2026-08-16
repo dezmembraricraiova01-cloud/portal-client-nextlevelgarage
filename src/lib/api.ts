@@ -301,6 +301,9 @@ export const api = {
 		}>('GET', `/inchirieri/flota/${masinaId}`),
 	inchirieriCereri: () =>
 		priv<{ cereri: InchiriereCerere[] }>('GET', '/inchirieri/cereri'),
+	inchirieriLocalitati: (q: string, loc: string) =>
+		priv<{ localitati: LocalitateGasita[] }>(
+			'GET', `/inchirieri/localitati?q=${encodeURIComponent(q)}&loc=${encodeURIComponent(loc)}`),
 	rezervaInchiriere: (masinaId: number, data: InchiriereForm) =>
 		priv<{ cerere: InchiriereCerere }>('POST', `/inchirieri/flota/${masinaId}/rezerva`, data),
 	anuleazaCerereInchiriere: (cerereId: number) =>
@@ -1057,6 +1060,19 @@ export interface LocalitateServita {
 	judet: string | null;
 	km:    number;
 	pret:  number;
+}
+
+/**
+ * Un rezultat din nomenclator. `servita = false` înseamnă că localitatea există
+ * dar nu ajungem încă acolo — se arată, ca omul să nu creadă că a scris greșit.
+ */
+export interface LocalitateGasita {
+	id:      number;
+	nume:    string;
+	judet:   string | null;
+	servita: boolean;
+	km:      number | null;
+	pret:    number | null;
 }
 
 /** O clasă din flotă și câte mașini are — ca filtrul să nu ofere pastile goale. */

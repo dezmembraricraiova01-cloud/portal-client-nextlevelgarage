@@ -9,7 +9,14 @@
 	// din dashboard au `overflow-hidden` pentru colțurile rotunjite și ar tăia o
 	// listă poziționată în interiorul lor.
 
-	type Optiune = { id: number; nume: string };
+	type Optiune = {
+		id: number;
+		nume: string;
+		/** Linie secundară — distanță, preț, motivul indisponibilității. */
+		sub?: string;
+		/** Se vede în listă, dar nu se poate alege. */
+		indisponibila?: boolean;
+	};
 
 	let {
 		optiuni = [],
@@ -18,6 +25,7 @@
 		disabled = false,
 		loading = false,
 		golText = 'Niciun rezultat',
+		onCauta = undefined,
 		id = undefined
 	}: {
 		optiuni?: Optiune[];
@@ -26,6 +34,12 @@
 		disabled?: boolean;
 		loading?: boolean;
 		golText?: string;
+		/**
+		 * Cine primește textul tastat poate aduce rezultate de pe server. Când e
+		 * dat, filtrarea locală se oprește: lista primită E răspunsul, iar o a
+		 * doua filtrare peste ea ar ascunde exact ce a găsit serverul.
+		 */
+		onCauta?: (q: string) => void;
 		id?: string;
 	} = $props();
 
@@ -45,11 +59,22 @@
 	}
 
 	const filtrate = $derived.by(() => {
+		if (onCauta) return optiuni;
+
 		const q = plat(cauta.trim());
 		if (!q) return optiuni;
 
 		return optiuni.filter((o) => plat(o.nume).includes(q));
 	});
+
+	/** Prima opțiune pe care chiar o poate alege — acolo pornește tastatura. */
+	function primaLibera(de: number, pas: number): number {
+		for (let i = de; i >= 0 && i < filtrate.length; i += pas) {
+			if (!filtrate[i].indisponibila) return i;
+		}
+
+		return de;
+	}
 
 	// Când valoarea e schimbată din afară (reset după salvare, schimbarea mărcii
 	// golește modelul), inputul trebuie să arate ce e selectat.
@@ -86,6 +111,7 @@
 	}
 
 	function alege(o: Optiune) {
+		if (o.indisponibila) return;
 		value = o.id;
 		deschis = false;
 		cauta = o.nume;
@@ -100,11 +126,11 @@
 
 		if (e.key === 'ArrowDown') {
 			e.preventDefault();
-			activ = Math.min(activ + 1, filtrate.length - 1);
+			activ = primaLibera(Math.min(activ + 1, filtrate.length - 1), 1);
 			vizibil();
 		} else if (e.key === 'ArrowUp') {
 			e.preventDefault();
-			activ = Math.max(activ - 1, 0);
+			activ = primaLibera(Math.max(activ - 1, 0), -1);
 			vizibil();
 		} else if (e.key === 'Enter') {
 			e.preventDefault();
@@ -151,6 +177,7 @@
 		oninput={() => {
 			if (!deschis) deschide();
 			activ = 0;
+			onCauta?.(cauta);
 		}}
 		onkeydown={peTasta}
 		class="w-full px-3.5 py-3 rounded-xl text-sm outline-none transition-all disabled:opacity-40"
@@ -186,14 +213,18 @@
 					type="button"
 					role="option"
 					aria-selected={o.id === value}
+					aria-disabled={o.indisponibila}
 					onclick={() => alege(o)}
-					onpointerenter={() => (activ = i)}
+					onpointerenter={() => !o.indisponibila && (activ = i)}
 					class="w-full text-left px-3.5 py-2.5 text-sm transition-colors"
-					style="background: {i === activ ? 'var(--surface2)' : 'transparent'};
-						color: {o.id === value ? 'var(--accent)' : 'var(--text)'};
-						border: none; cursor: pointer;"
+					style="background: {i === activ && !o.indisponibila ? 'var(--surface2)' : 'transparent'};
+						color: {o.indisponibila ? 'var(--muted)' : o.id === value ? 'var(--accent)' : 'var(--text)'};
+						border: none; cursor: {o.indisponibila ? 'not-allowed' : 'pointer'};"
 				>
 					{o.nume}
+					{#if o.sub}
+						<span class="block text-[11px] leading-snug mt-0.5" style="color: var(--muted)">{o.sub}</span>
+					{/if}
 				</button>
 			{/each}
 		{/if}
