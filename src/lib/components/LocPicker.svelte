@@ -12,6 +12,7 @@
 		deschis = $bindable(false),
 		tip = $bindable('sediu'),
 		adresa = $bindable(''),
+		localitateId = $bindable(0),
 		locuri = [],
 		titlu = 'De unde iei mașina?'
 	}: {
@@ -20,22 +21,42 @@
 		tip?: string;
 		/** Adresa scrisă de client, folosită doar unde catalogul o cere. */
 		adresa?: string;
+		/** Localitatea aleasă; 0 = niciuna. Doar la locurile plătite pe km. */
+		localitateId?: number;
 		locuri?: LocInchiriere[];
 		titlu?: string;
 	} = $props();
 
 	let ciornaTip = $state('sediu');
 	let ciornaAdresa = $state('');
+	let ciornaLocalitate = $state(0);
 
 	$effect(() => {
 		if (!deschis) return;
 		ciornaTip = tip;
 		ciornaAdresa = adresa;
+		ciornaLocalitate = localitateId;
 	});
 
 	const ales = $derived(locuri.find((l) => l.cod === ciornaTip) ?? null);
 	const cereAdresa = $derived(!!ales?.cere_adresa);
-	const gata = $derived(!!ales && (!cereAdresa || ciornaAdresa.trim().length > 3));
+	const cereLocalitate = $derived(!!ales?.cere_localitate);
+
+	const localitateAleasa = $derived(
+		ales?.localitati.find((l) => l.id === ciornaLocalitate) ?? null
+	);
+
+	// Prețul locului ales: cel al localității când se plătește pe km, altfel taxa
+	// fixă. Cifra vine de la server; aici doar se alege care dintre ele se arată.
+	const pretAles = $derived(
+		cereLocalitate ? (localitateAleasa?.pret ?? null) : (ales?.taxa ?? 0)
+	);
+
+	const gata = $derived(
+		!!ales
+		&& (!cereAdresa || ciornaAdresa.trim().length > 3)
+		&& (!cereLocalitate || !!localitateAleasa)
+	);
 
 	function confirma() {
 		if (!gata) return;
@@ -43,6 +64,7 @@
 		// Adresa nu se cară mai departe când locul n-o cere: altfel operatorul
 		// citește o adresă rămasă dintr-o alegere de care clientul s-a răzgândit.
 		adresa = cereAdresa ? ciornaAdresa.trim() : '';
+		localitateId = cereLocalitate ? ciornaLocalitate : 0;
 		deschis = false;
 	}
 
@@ -91,12 +113,39 @@
 							{/if}
 						</span>
 						<span class="text-[11px] font-bold shrink-0"
-							style="color: {l.taxa > 0 ? '#eab308' : '#22c55e'}">
-							{l.taxa > 0 ? `+${l.taxa} lei` : 'gratuit'}
+							style="color: {l.cere_localitate || l.taxa > 0 ? '#eab308' : '#22c55e'}">
+							{#if l.cere_localitate}
+								după distanță
+							{:else if l.taxa > 0}
+								+{l.taxa} lei
+							{:else}
+								gratuit
+							{/if}
 						</span>
 					</button>
 				{/each}
 			</div>
+
+			{#if cereLocalitate}
+				<label class="block mt-3">
+					<span class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--muted)">Localitatea</span>
+					{#if ales && ales.localitati.length > 0}
+						<select bind:value={ciornaLocalitate}
+							class="w-full mt-1 text-sm px-3 py-2.5 rounded-xl"
+							style="background: var(--surface2); border: 1px solid var(--border); color: var(--text);">
+							<option value={0}>Alege localitatea</option>
+							{#each ales.localitati as l (l.id)}
+								<option value={l.id}>{l.nume} · {l.km} km · {l.pret} lei</option>
+							{/each}
+						</select>
+					{:else}
+						<!-- Nicio localitate configurată: nu inventăm un preț, spunem adevărul. -->
+						<p class="mt-1 text-[12px] leading-snug" style="color: var(--muted)">
+							Nu avem încă tarife de livrare setate. Sună-ne și stabilim pe loc.
+						</p>
+					{/if}
+				</label>
+			{/if}
 
 			{#if cereAdresa}
 				<label class="block mt-3">
@@ -109,6 +158,16 @@
 						style="background: var(--surface2); border: 1px solid var(--border); color: var(--text);"
 					/>
 				</label>
+			{/if}
+
+			{#if pretAles !== null && pretAles > 0}
+				<p class="text-[12px] mt-3" style="color: var(--muted)">
+					Costă <b style="color: #eab308">{pretAles} lei</b>
+					{#if localitateAleasa}
+						pentru {localitateAleasa.km} km
+					{/if}
+					— o singură dată, nu pe zi.
+				</p>
 			{/if}
 
 			<div class="flex gap-2 mt-4">

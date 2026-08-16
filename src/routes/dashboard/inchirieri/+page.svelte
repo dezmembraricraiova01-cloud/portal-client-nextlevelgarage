@@ -28,8 +28,10 @@
 	// a doua alegere identică e muncă degeaba pentru toți.
 	let locDeTip       = $state('sediu');
 	let locDeAdresa    = $state('');
+	let locDeLocalitate = $state(0);
 	let locPanaTip     = $state('sediu');
 	let locPanaAdresa  = $state('');
+	let locPanaLocalitate = $state(0);
 	let altLoc         = $state(false);
 	let pickerDe       = $state(false);
 	let pickerPana     = $state(false);
@@ -38,17 +40,29 @@
 		return locuri.find((l) => l.cod === cod) ?? null;
 	}
 
-	function etichetaLoc(cod: string, adresa: string): string {
-		if (adresa.trim()) return adresa.trim();
+	function etichetaLoc(cod: string, adresa: string, localitateId = 0): string {
+		const loc = locDupaCod(cod);
+		const localitate = loc?.localitati.find((l) => l.id === localitateId);
 
-		return locDupaCod(cod)?.label ?? 'Sediu';
+		if (adresa.trim()) return localitate ? `${adresa.trim()}, ${localitate.nume}` : adresa.trim();
+
+		return localitate ? `${loc?.label} · ${localitate.nume}` : (loc?.label ?? 'Sediu');
+	}
+
+	/** Cât costă un capăt: prețul localității când se plătește pe km, altfel taxa fixă. */
+	function taxaCapat(cod: string, localitateId: number): number {
+		const loc = locDupaCod(cod);
+		if (!loc) return 0;
+		if (!loc.cere_localitate) return loc.taxa;
+
+		return loc.localitati.find((l) => l.id === localitateId)?.pret ?? 0;
 	}
 
 	// Ambele capete, întotdeauna. Când returnarea urmează preluarea, tot două
 	// drumuri face șoferul, iar serverul taxează amândouă — o bară care arată
 	// jumătate din ce se încasează e mai rea decât una care nu arată nimic.
 	let taxaLoc = $derived(
-		(locDupaCod(locDeTip)?.taxa ?? 0) + (locDupaCod(locPanaTip)?.taxa ?? 0)
+		taxaCapat(locDeTip, locDeLocalitate) + taxaCapat(locPanaTip, locPanaLocalitate)
 	);
 
 	function comutaAltLoc() {
@@ -56,6 +70,7 @@
 		if (!altLoc) {
 			locPanaTip = locDeTip;
 			locPanaAdresa = locDeAdresa;
+			locPanaLocalitate = locDeLocalitate;
 		}
 	}
 
@@ -64,6 +79,7 @@
 		if (altLoc) return;
 		locPanaTip = locDeTip;
 		locPanaAdresa = locDeAdresa;
+		locPanaLocalitate = locDeLocalitate;
 	});
 
 	function dataScurta(cod: string): string {
@@ -153,6 +169,7 @@
 		if (locDeTip !== 'sediu' || locDeAdresa) {
 			p.set('loc_de', locDeTip);
 			if (locDeAdresa) p.set('adr_de', locDeAdresa);
+			if (locDeLocalitate) p.set('uat_de', String(locDeLocalitate));
 		}
 		// Capătul separat se scrie ÎNTOTDEAUNA când e desfăcut, chiar dacă e
 		// sediul: fără el, pasul următor deduce că returnarea urmează preluarea
@@ -160,6 +177,7 @@
 		if (altLoc) {
 			p.set('loc_pana', locPanaTip);
 			if (locPanaAdresa) p.set('adr_pana', locPanaAdresa);
+			if (locPanaLocalitate) p.set('uat_pana', String(locPanaLocalitate));
 		}
 
 		return `/dashboard/inchirieri/${id}?${p.toString()}`;
@@ -271,7 +289,7 @@
 				class="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left active:scale-[0.99] transition-transform"
 				style="background: var(--surface); border: 1px solid var(--border); color: var(--text);">
 				<span class="text-[10px] font-bold uppercase tracking-wider shrink-0" style="color: var(--muted)">Iau din</span>
-				<span class="text-sm font-semibold truncate">{etichetaLoc(locDeTip, locDeAdresa)}</span>
+				<span class="text-sm font-semibold truncate">{etichetaLoc(locDeTip, locDeAdresa, locDeLocalitate)}</span>
 				{#if (locDupaCod(locDeTip)?.taxa ?? 0) > 0}
 					<span class="ml-auto text-[11px] font-bold shrink-0" style="color: #eab308">+{locDupaCod(locDeTip)?.taxa} lei</span>
 				{:else}
@@ -284,7 +302,7 @@
 					class="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left active:scale-[0.99] transition-transform"
 					style="background: var(--surface); border: 1px solid var(--border); color: var(--text);">
 					<span class="text-[10px] font-bold uppercase tracking-wider shrink-0" style="color: var(--muted)">Aduc la</span>
-					<span class="text-sm font-semibold truncate">{etichetaLoc(locPanaTip, locPanaAdresa)}</span>
+					<span class="text-sm font-semibold truncate">{etichetaLoc(locPanaTip, locPanaAdresa, locPanaLocalitate)}</span>
 					{#if (locDupaCod(locPanaTip)?.taxa ?? 0) > 0}
 						<span class="ml-auto text-[11px] font-bold shrink-0" style="color: #eab308">+{locDupaCod(locPanaTip)?.taxa} lei</span>
 					{:else}
