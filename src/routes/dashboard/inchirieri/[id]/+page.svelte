@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { api, type MasinaInchiriereDetaliu, type IntervalBlocat, type InchiriereForm, type ExtraOferit, type LocInchiriere, type InchiriereCerere } from '$lib/api';
 	import Skeleton from '$lib/Skeleton.svelte';
+	import CalendarInterval from '$lib/components/CalendarInterval.svelte';
 
 	let masina    = $state<MasinaInchiriereDetaliu | null>(null);
 	let blocate   = $state<IntervalBlocat[]>([]);
@@ -34,6 +35,10 @@
 	let saving      = $state(false);
 	let formError   = $state('');
 	let formSuccess = $state(false);
+
+	let calendarDeschis = $state(false);
+	/** Calendarul s-a deschis din butonul de rezervare, deci drumul continuă spre sumar. */
+	let intervalCerutDinCta = $state(false);
 
 	// Cererea așa cum a înregistrat-o serverul. Recapitularea de la final se face
 	// din ea, nu din calculele de aici: omul trebuie să vadă ce s-a scris în
@@ -101,9 +106,6 @@
 	let canGoStep2 = $derived(!!dataStart && !!dataEnd && nrZile > 0 && !intervalConflict);
 	let canGoStep3 = $derived(canGoStep2);
 	let canSubmit  = $derived(canGoStep2 && !saving);
-
-	const today = new Date().toISOString().slice(0, 10);
-	const maxDate = new Date(Date.now() + 180 * 86_400_000).toISOString().slice(0, 10);
 
 	async function load() {
 		loading = true;
@@ -185,10 +187,33 @@
 		document.getElementById('pas')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 	}
 
-	async function schimbaDatele() {
-		await mergiLaPas(1);
-		document.getElementById('ds')?.focus();
+	/**
+	 * Deschide DIRECT calendarul, de oriunde s-ar cere schimbarea perioadei.
+	 *
+	 * Înainte doar aducea pasul cu datele în dreptul ochilor și punea cursorul pe
+	 * câmp — omul apăsa „alege perioada" și primea un formular, nu un calendar.
+	 */
+	function deschideCalendarul() {
+		calendarDeschis = true;
 	}
+
+	async function schimbaDatele() {
+		if (step !== 1) await mergiLaPas(1);
+		deschideCalendarul();
+	}
+
+	/**
+	 * După ce s-a ales perioada, drumul continuă singur spre sumar — dar numai
+	 * dacă omul era la pasul cu datele. Cine deschide calendarul de la „Schimbă"
+	 * stând pe Extras sau pe Confirmă rămâne unde era; nu-l mutăm de sub mână.
+	 */
+	$effect(() => {
+		if (calendarDeschis || step !== 1 || !canGoStep3) return;
+		if (!intervalCerutDinCta) return;
+
+		intervalCerutDinCta = false;
+		mergiLaPas(3);
+	});
 
 	/**
 	 * „Rezervă acum" duce la ultimul pas, unde omul vede cifra înainte s-o ceară.
@@ -196,7 +221,13 @@
 	 * calendar chiar și pe cineva care venise din listă cu datele alese.
 	 */
 	async function rezervaAcum() {
-		if (!canGoStep3) { await schimbaDatele(); return; }
+		if (!canGoStep3) {
+			intervalCerutDinCta = true;
+			await schimbaDatele();
+
+			return;
+		}
+
 		await mergiLaPas(3);
 	}
 
@@ -571,6 +602,10 @@
 				</button>
 			</div>
 
+			<!-- Calendarul cunoaște zilele deja rezervate pe mașina asta, deci le stinge
+			     în loc să lase omul să le aleagă și să afle abia la trimitere. -->
+			<CalendarInterval bind:deschis={calendarDeschis} bind:de={dataStart} bind:pana={dataEnd} {blocate} />
+
 			{#if intervalConflict}
 				<p class="text-xs px-1" style="color: #ef4444">
 					Mașina e deja rezervată în perioada asta — schimbă datele.
@@ -655,22 +690,21 @@
 					<h2 class="font-bold text-base" style="color: var(--text)">Alege intervalul</h2>
 					<p class="text-xs" style="color: var(--muted)">Plata la ridicare. Te sunăm pentru confirmare.</p>
 
-					<div class="grid grid-cols-2 gap-2">
-						<div>
-							<label for="ds" class="text-[11px] font-semibold uppercase tracking-wider" style="color: var(--muted)">De la</label>
-							<input id="ds" type="date" bind:value={dataStart}
-								min={today} max={maxDate} required
-								class="w-full mt-1 text-sm px-3 py-2.5 rounded-xl"
-								style="background: var(--surface2); border: 1px solid var(--border); color: var(--text);" />
-						</div>
-						<div>
-							<label for="de" class="text-[11px] font-semibold uppercase tracking-wider" style="color: var(--muted)">Până la</label>
-							<input id="de" type="date" bind:value={dataEnd}
-								min={dataStart || today} max={maxDate} required
-								class="w-full mt-1 text-sm px-3 py-2.5 rounded-xl"
-								style="background: var(--surface2); border: 1px solid var(--border); color: var(--text);" />
-						</div>
-					</div>
+					<!-- Un singur calendar pentru ambele capete, ca pe listă. Două
+					     `<input type="date">` deschideau alt selector în fiecare browser,
+					     niciunul nu știa de celălalt capăt și niciunul nu putea stinge
+					     zilele deja rezervate — pe care ecranul ăsta le are la îndemână. -->
+					<button type="button" onclick={deschideCalendarul}
+						class="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left active:scale-[0.99] transition-transform"
+						style="background: var(--surface2); border: 1.5px solid {canGoStep3 ? theme.accent : 'var(--border)'}; color: var(--text);">
+						<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color: var(--muted); flex: none;"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>
+						{#if nrZile > 0}
+							<span class="text-sm font-semibold truncate">{fmtDate(dataStart)} → {fmtDate(dataEnd)}</span>
+						{:else}
+							<span class="text-sm" style="color: var(--muted)">Alege zilele</span>
+						{/if}
+						<span class="ml-auto text-xs shrink-0" style="color: var(--muted)">▾</span>
+					</button>
 
 					{#if intervalConflict}
 						<div class="p-2.5 rounded-lg text-xs"
