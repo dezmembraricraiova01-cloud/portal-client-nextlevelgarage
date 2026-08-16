@@ -3,23 +3,23 @@
 </script>
 
 <svelte:head>
-	<title>Formular consimÈ›ÄƒmÃ¢nt GDPR â€” service</title>
+	<title>Formular consimțământ GDPR — service</title>
 </svelte:head>
 
 <div class="page">
 	<div class="no-print toolbar">
-		<button onclick={tipareste}>ðŸ–¨ï¸ TipÄƒreÈ™te formular</button>
-		<a href="/legal/privacy" class="link">Vezi politica de confidenÈ›ialitate</a>
+		<button onclick={tipareste}>🖨️ Tipărește formular</button>
+		<a href="/legal/privacy" class="link">Vezi politica de confidențialitate</a>
 	</div>
 
 	<div class="paper">
 		<header class="hdr">
 			<div>
-				<h1>FORMULAR DE INFORMARE È˜I CONSIMÈšÄ‚MÃ‚NT</h1>
+				<h1>FORMULAR DE INFORMARE ȘI CONSIMȚĂMÂNT</h1>
 				<p class="sub">privind prelucrarea datelor cu caracter personal</p>
 			</div>
 			<div class="firma">
-				<strong>[Denumire firmÄƒ SRL]</strong><br/>
+				<strong>[Denumire firmă SRL]</strong><br/>
 				CUI: [______________]<br/>
 				Sediu: [_________________________________]<br/>
 				Tel: [_____________]  Email: contact@nlg.ro
@@ -30,13 +30,13 @@
 			<h2>I. Datele clientului</h2>
 			<table class="form">
 				<tbody>
-				<tr><td>Nume È™i prenume</td><td class="fill"></td></tr>
+				<tr><td>Nume și prenume</td><td class="fill"></td></tr>
 				<tr><td>CNP</td><td class="fill"></td></tr>
 				<tr><td>Serie / nr. CI</td><td class="fill"></td></tr>
 				<tr><td>Domiciliu</td><td class="fill"></td></tr>
 				<tr><td>Telefon</td><td class="fill"></td></tr>
 				<tr><td>Email</td><td class="fill"></td></tr>
-				<tr><td>Nr. Ã®nmatriculare auto</td><td class="fill"></td></tr>
+				<tr><td>Nr. înmatriculare auto</td><td class="fill"></td></tr>
 				</tbody>
 			</table>
 		</section>
@@ -44,91 +44,91 @@
 		<section>
 			<h2>II. Operatorul de date</h2>
 			<p>
-				<strong>[Denumire firmÄƒ SRL]</strong>, CUI <strong>[______]</strong>, cu sediul Ã®n
-				<strong>[___________________________]</strong>, Ã®n calitate de <em>operator de date cu caracter
-				personal</em> conform Regulamentului (UE) 2016/679 (GDPR) È™i Legii nr. 190/2018.
+				<strong>[Denumire firmă SRL]</strong>, CUI <strong>[______]</strong>, cu sediul în
+				<strong>[___________________________]</strong>, în calitate de <em>operator de date cu caracter
+				personal</em> conform Regulamentului (UE) 2016/679 (GDPR) și Legii nr. 190/2018.
 			</p>
-			<p>Contact protecÈ›ia datelor: <strong>gdpr@nlg.ro</strong> Â· DPO (dacÄƒ este desemnat): [______________]</p>
+			<p>Contact protecția datelor: <strong>gdpr@nlg.ro</strong> · DPO (dacă este desemnat): [______________]</p>
 		</section>
 
 		<section>
 			<h2>III. Categorii de date prelucrate</h2>
 			<ul>
-				<li>date de identificare (nume, CNP, CI, semnÄƒturÄƒ)</li>
-				<li>date de contact (telefon, email, adresÄƒ)</li>
-				<li>date despre vehicul (marcÄƒ, model, VIN, nr. Ã®nmatriculare, talon, ITP, RCA, CASCO)</li>
-				<li>date despre lucrÄƒri (devize, facturi, fotografii, istoric service)</li>
-				<li>date de platÄƒ (sume, metode â€” fÄƒrÄƒ date de card)</li>
-				<li>imagini CCTV (la sediu, pÄƒstrate 30 de zile)</li>
+				<li>date de identificare (nume, CNP, CI, semnătură)</li>
+				<li>date de contact (telefon, email, adresă)</li>
+				<li>date despre vehicul (marcă, model, VIN, nr. înmatriculare, talon, ITP, RCA, CASCO)</li>
+				<li>date despre lucrări (devize, facturi, fotografii, istoric service)</li>
+				<li>date de plată (sume, metode — fără date de card)</li>
+				<li>imagini CCTV (la sediu, păstrate 30 de zile)</li>
 			</ul>
 		</section>
 
 		<section>
-			<h2>IV. Scopuri È™i temeiuri legale</h2>
+			<h2>IV. Scopuri și temeiuri legale</h2>
 			<table class="info">
-				<thead><tr><th>Scop</th><th>Temei legal</th><th>DuratÄƒ pÄƒstrare</th></tr></thead>
+				<thead><tr><th>Scop</th><th>Temei legal</th><th>Durată păstrare</th></tr></thead>
 				<tbody>
-					<tr><td>Executarea contractului de service</td><td>Art. 6(1)(b) GDPR â€” contract</td><td>Durata contractului + 3 ani</td></tr>
-					<tr><td>Emiterea facturii È™i contabilitate</td><td>Art. 6(1)(c) â€” Legea contabilitÄƒÈ›ii, Cod fiscal</td><td>10 ani</td></tr>
-					<tr><td>ObligaÈ›ii fiscale È™i de raportare</td><td>Art. 6(1)(c) â€” obligaÈ›ie legalÄƒ</td><td>10 ani</td></tr>
-					<tr><td>ApÄƒrarea drepturilor Ã®n instanÈ›Äƒ</td><td>Art. 6(1)(f) â€” interes legitim</td><td>Termen prescripÈ›ie (max. 10 ani)</td></tr>
-					<tr><td>Reminder ITP/RCA/revizii</td><td>Art. 6(1)(f) â€” interes legitim</td><td>Durata relaÈ›iei + 1 an</td></tr>
-					<tr><td>CCTV</td><td>Art. 6(1)(f) â€” interes legitim, securitate</td><td>30 de zile</td></tr>
-					<tr><td>Marketing direct (SMS/email cu oferte)</td><td>Art. 6(1)(a) â€” consimÈ›ÄƒmÃ¢nt explicit</td><td>PÃ¢nÄƒ la retragere</td></tr>
+					<tr><td>Executarea contractului de service</td><td>Art. 6(1)(b) GDPR — contract</td><td>Durata contractului + 3 ani</td></tr>
+					<tr><td>Emiterea facturii și contabilitate</td><td>Art. 6(1)(c) — Legea contabilității, Cod fiscal</td><td>10 ani</td></tr>
+					<tr><td>Obligații fiscale și de raportare</td><td>Art. 6(1)(c) — obligație legală</td><td>10 ani</td></tr>
+					<tr><td>Apărarea drepturilor în instanță</td><td>Art. 6(1)(f) — interes legitim</td><td>Termen prescripție (max. 10 ani)</td></tr>
+					<tr><td>Reminder ITP/RCA/revizii</td><td>Art. 6(1)(f) — interes legitim</td><td>Durata relației + 1 an</td></tr>
+					<tr><td>CCTV</td><td>Art. 6(1)(f) — interes legitim, securitate</td><td>30 de zile</td></tr>
+					<tr><td>Marketing direct (SMS/email cu oferte)</td><td>Art. 6(1)(a) — consimțământ explicit</td><td>Până la retragere</td></tr>
 				</tbody>
 			</table>
 		</section>
 
 		<section>
 			<h2>V. Destinatari</h2>
-			<p>Datele pot fi transmise cÄƒtre: furnizori de piese, RAR, asigurÄƒtori (cu acordul clientului),
-			furnizori IT (hosting, email/SMS), contabil, autoritÄƒÈ›i publice (la cerere oficialÄƒ), avocaÈ›i.</p>
-			<p><strong>Nu transferÄƒm date Ã®n afara UE/SEE</strong> fÄƒrÄƒ mÄƒsuri adecvate (clauze contractuale standard).</p>
+			<p>Datele pot fi transmise către: furnizori de piese, RAR, asigurători (cu acordul clientului),
+			furnizori IT (hosting, email/SMS), contabil, autorități publice (la cerere oficială), avocați.</p>
+			<p><strong>Nu transferăm date în afara UE/SEE</strong> fără măsuri adecvate (clauze contractuale standard).</p>
 		</section>
 
 		<section>
-			<h2>VI. Drepturile dumneavoastrÄƒ (art. 15â€“22 GDPR)</h2>
+			<h2>VI. Drepturile dumneavoastră (art. 15–22 GDPR)</h2>
 			<ul class="dense">
 				<li>dreptul de acces la date</li>
 				<li>dreptul la rectificare</li>
-				<li>dreptul la È™tergere (â€ždreptul de a fi uitat")</li>
-				<li>dreptul la restricÈ›ionarea prelucrÄƒrii</li>
+				<li>dreptul la ștergere („dreptul de a fi uitat")</li>
+				<li>dreptul la restricționarea prelucrării</li>
 				<li>dreptul la portabilitatea datelor</li>
-				<li>dreptul de opoziÈ›ie (Ã®n special pentru marketing direct)</li>
+				<li>dreptul de opoziție (în special pentru marketing direct)</li>
 				<li>dreptul de a nu fi supus unor decizii automate</li>
-				<li>dreptul de a-È›i retrage consimÈ›ÄƒmÃ¢ntul oricÃ¢nd</li>
-				<li>dreptul de a depune plÃ¢ngere la <strong>ANSPDCP</strong> (B-dul G. Magheru 28-30, BucureÈ™ti â€” dataprotection.ro)</li>
+				<li>dreptul de a-ți retrage consimțământul oricând</li>
+				<li>dreptul de a depune plângere la <strong>ANSPDCP</strong> (B-dul G. Magheru 28-30, București — dataprotection.ro)</li>
 			</ul>
-			<p>Cererile se adreseazÄƒ Ã®n scris la sediu sau pe email <strong>gdpr@nlg.ro</strong>.
-			RÄƒspundem Ã®n maximum 30 de zile.</p>
+			<p>Cererile se adresează în scris la sediu sau pe email <strong>gdpr@nlg.ro</strong>.
+			Răspundem în maximum 30 de zile.</p>
 		</section>
 
 		<section class="acord">
-			<h2>VII. DeclaraÈ›ii È™i consimÈ›ÄƒmÃ¢nt</h2>
+			<h2>VII. Declarații și consimțământ</h2>
 
 			<p class="check">
 				<span class="box-check"></span>
-				<span><strong>Confirm</strong> cÄƒ am citit È™i am Ã®nÈ›eles informaÈ›iile de mai sus È™i sunt de acord
-				cu prelucrarea datelor mele personale pentru executarea contractului de service È™i obligaÈ›iile legale.
+				<span><strong>Confirm</strong> că am citit și am înțeles informațiile de mai sus și sunt de acord
+				cu prelucrarea datelor mele personale pentru executarea contractului de service și obligațiile legale.
 				<em>(obligatoriu pentru prestarea serviciului)</em></span>
 			</p>
 
 			<p class="check">
 				<span class="box-check"></span>
-				<span>Sunt de acord sÄƒ primesc <strong>SMS/email cu oferte È™i promoÈ›ii</strong> de la NLG.
-				<em>(opÈ›ional â€” Ã®l poÈ›i retrage oricÃ¢nd)</em></span>
+				<span>Sunt de acord să primesc <strong>SMS/email cu oferte și promoții</strong> de la NLG.
+				<em>(opțional — îl poți retrage oricând)</em></span>
 			</p>
 
 			<p class="check">
 				<span class="box-check"></span>
-				<span>Sunt de acord ca service-ul sÄƒ <strong>fotografieze vehiculul</strong> (interior/exterior)
-				pentru documentarea stÄƒrii la primire/predare. <em>(opÈ›ional)</em></span>
+				<span>Sunt de acord ca service-ul să <strong>fotografieze vehiculul</strong> (interior/exterior)
+				pentru documentarea stării la primire/predare. <em>(opțional)</em></span>
 			</p>
 
 			<p class="check">
 				<span class="box-check"></span>
-				<span>Sunt de acord cu <strong>Ã®nregistrarea apelurilor telefonice</strong> pentru Ã®mbunÄƒtÄƒÈ›irea
-				serviciilor. <em>(opÈ›ional)</em></span>
+				<span>Sunt de acord cu <strong>înregistrarea apelurilor telefonice</strong> pentru îmbunătățirea
+				serviciilor. <em>(opțional)</em></span>
 			</p>
 		</section>
 
@@ -138,19 +138,19 @@
 				<p>Locul: <span class="line short"></span></p>
 			</div>
 			<div class="sig">
-				<p><strong>SemnÄƒtura clientului</strong></p>
+				<p><strong>Semnătura clientului</strong></p>
 				<div class="sig-box"></div>
 			</div>
 			<div class="sig">
 				<p><strong>Reprezentant NLG</strong></p>
 				<p>Nume: <span class="line"></span></p>
-				<p>FuncÈ›ie: <span class="line"></span></p>
+				<p>Funcție: <span class="line"></span></p>
 				<div class="sig-box"></div>
 			</div>
 		</section>
 
 		<footer class="ftr">
-			<p>Acest formular se completeazÄƒ Ã®n 2 exemplare â€” unul rÄƒmÃ¢ne la client, unul la operator.
+			<p>Acest formular se completează în 2 exemplare — unul rămâne la client, unul la operator.
 			Versiunea documentului: <strong>1.0 / 03.05.2026</strong>.</p>
 		</footer>
 	</div>
