@@ -144,20 +144,29 @@
 
 		// Dev shortcut: Ctrl+Shift+X. Plus URL ?dev=1 ca fallback fara tastatura.
 		// (Ctrl+Shift+<cifra> e prins de Windows pentru switch keyboard layout — nu ajunge la browser.)
-		const triggerDevLogin = () => {
-			api.devLogin().then(r => { auth.login(r.client); goto('/dashboard'); }).catch(() => {});
+		// Cheia se cere de la om, deliberat: gating-ul real stă în WMS, iar cheia NU
+		// trebuie să ajungă în bundle (vezi src/routes/api/auth/dev/+server.ts).
+		// `?dev=1&devkey=…` o poate da direct, ca să nu ceară prompt la fiecare reîncărcare.
+		const triggerDevLogin = (devKey: string) => {
+			if (!devKey) return;
+			api.devLogin(devKey)
+				.then(r => { auth.login(r.client); goto('/dashboard'); })
+				// Înainte eroarea era înghițită: cheie greșită = niciun semn pe ecran.
+				.catch((e: { message?: string }) => { error = e?.message ?? 'Dev login eșuat.'; });
 		};
+		const ceriCheiaDev = () => triggerDevLogin(window.prompt('Cheie dev:') ?? '');
 		const onKey = (e: KeyboardEvent) => {
 			if (e.ctrlKey && e.shiftKey && (e.key === 'X' || e.key === 'x' || e.code === 'KeyX')) {
 				e.preventDefault();
-				triggerDevLogin();
+				ceriCheiaDev();
 			}
 		};
 		window.addEventListener('keydown', onKey);
 		cleanups.push(() => window.removeEventListener('keydown', onKey));
 
 		if (page.url.searchParams.get('dev') === '1') {
-			triggerDevLogin();
+			const dinUrl = page.url.searchParams.get('devkey');
+			if (dinUrl) triggerDevLogin(dinUrl); else ceriCheiaDev();
 		}
 
 		// URL params

@@ -141,8 +141,11 @@
 			</div>
 
 			{#snippet programareChip(overlay: boolean)}
-				{#if data.urmatoarea_programare}
-					{@const p = data.urmatoarea_programare}
+				<!-- `data` e non-null aici (snippetul trăiește sub `{:else if data}`), dar
+				     îngustarea nu trece granița snippetului: el se compilează ca funcție
+				     separată. Citim o dată, cu `?.`, și restul se leagă de `p`. -->
+				{@const p = data?.urmatoarea_programare}
+				{#if p}
 					<a href="/dashboard/programari"
 						class="hero-pill {overlay ? 'is-overlay' : ''} group inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full">
 						<span class="hero-pill-icon">📅</span>
