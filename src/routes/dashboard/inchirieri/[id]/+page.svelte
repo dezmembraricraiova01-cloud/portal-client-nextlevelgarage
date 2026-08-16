@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { page } from '$app/state';
-	import { api, type MasinaInchiriereDetaliu, type IntervalBlocat, type InchiriereForm, type ExtraOferit, type LocInchiriere } from '$lib/api';
+	import { api, type MasinaInchiriereDetaliu, type IntervalBlocat, type InchiriereForm, type ExtraOferit, type LocInchiriere, type InchiriereCerere } from '$lib/api';
 	import Skeleton from '$lib/Skeleton.svelte';
 
 	let masina    = $state<MasinaInchiriereDetaliu | null>(null);
@@ -34,6 +34,11 @@
 	let saving      = $state(false);
 	let formError   = $state('');
 	let formSuccess = $state(false);
+
+	// Cererea așa cum a înregistrat-o serverul. Recapitularea de la final se face
+	// din ea, nu din calculele de aici: omul trebuie să vadă ce s-a scris în
+	// registru, nu ce socotise ecranul cu o secundă înainte.
+	let cerereTrimisa = $state<InchiriereCerere | null>(null);
 
 	let masinaId = $derived(Number(page.params.id));
 
@@ -173,6 +178,28 @@
 		}
 	}
 
+	/** Duce la un pas și îl aduce în dreptul ochilor — altfel pare că nu s-a întâmplat nimic. */
+	async function mergiLaPas(nou: 1 | 2 | 3) {
+		step = nou;
+		await tick();
+		document.getElementById('pas')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	}
+
+	async function schimbaDatele() {
+		await mergiLaPas(1);
+		document.getElementById('ds')?.focus();
+	}
+
+	/**
+	 * „Rezervă acum" duce la ultimul pas, unde omul vede cifra înainte s-o ceară.
+	 * Doar când n-avem interval întreabă de date — înainte trimitea înapoi la
+	 * calendar chiar și pe cineva care venise din listă cu datele alese.
+	 */
+	async function rezervaAcum() {
+		if (!canGoStep3) { await schimbaDatele(); return; }
+		await mergiLaPas(3);
+	}
+
 	async function rezerva() {
 		formError = '';
 		saving = true;
@@ -190,8 +217,10 @@
 				loc_returnare_adresa: locPanaAdresa || undefined,
 				loc_returnare_localitate_id: locPanaUat || undefined,
 			};
-			await api.rezervaInchiriere(masinaId, data);
+			const res = await api.rezervaInchiriere(masinaId, data);
+			cerereTrimisa = res.cerere;
 			formSuccess = true;
+			window.scrollTo({ top: 0, behavior: 'smooth' });
 		} catch (e: any) {
 			formError = e.message ?? 'Cererea nu a putut fi trimisă.';
 			if (e.status === 409) load();
@@ -258,12 +287,87 @@
 		</div>
 
 		{#if formSuccess}
-			<div class="text-center py-12 px-4 rounded-2xl border"
-				style="background: var(--surface); border-color: var(--border);">
-				<div class="text-5xl mb-3">✅</div>
-				<p class="font-bold text-lg" style="color: var(--text)">Cererea ta a fost trimisă</p>
-				<p class="text-sm mt-1" style="color: var(--muted)">Te contactăm telefonic pentru confirmare.</p>
-				<div class="flex gap-2 mt-5 justify-center">
+			<!--
+				Confirmarea arată REZERVAREA, nu doar o bifă: de când până când, cât
+				costă, unde se ia și unde se aduce mașina. Cifrele vin din răspunsul
+				serverului (`cerereTrimisa`), deci e exact ce s-a înregistrat.
+			-->
+			<div class="rounded-2xl border overflow-hidden"
+				style="background: var(--surface); border-color: #22c55e55;">
+				<div class="px-4 py-4 text-center"
+					style="background: linear-gradient(180deg, #22c55e22, transparent);">
+					<div class="text-4xl mb-1.5">✅</div>
+					<p class="font-bold text-lg" style="color: var(--text)">Cererea ta a fost preluată</p>
+					<p class="text-sm mt-1" style="color: var(--muted)">
+						Te sunăm pentru confirmare, de regulă în 30 de minute.
+					</p>
+					{#if cerereTrimisa}
+						<p class="text-[11px] mt-2 font-semibold uppercase tracking-wider" style="color: var(--muted)">
+							Cererea #{cerereTrimisa.id} · {cerereTrimisa.status_label}
+						</p>
+					{/if}
+				</div>
+
+				{#if cerereTrimisa}
+					{@const c = cerereTrimisa}
+					<div class="px-4 pb-4 space-y-1.5 text-sm">
+						<div class="flex justify-between gap-3">
+							<span style="color: var(--muted)">Mașină</span>
+							<span class="font-semibold text-right" style="color: var(--text)">
+								{c.masina ? `${c.masina.marca} ${c.masina.model}` : '—'}
+								{#if c.masina?.numar_inmatriculare}
+									<span class="font-mono text-xs" style="color: var(--muted)"> · {c.masina.numar_inmatriculare}</span>
+								{/if}
+							</span>
+						</div>
+						<div class="flex justify-between gap-3">
+							<span style="color: var(--muted)">Perioadă</span>
+							<span class="font-semibold text-right" style="color: var(--text)">
+								{fmtDate(c.data_start)} → {fmtDate(c.data_end)}
+							</span>
+						</div>
+						<div class="flex justify-between gap-3">
+							<span style="color: var(--muted)">Preluare</span>
+							<span class="text-right" style="color: var(--text)">{c.loc_preluare.text}</span>
+						</div>
+						<div class="flex justify-between gap-3">
+							<span style="color: var(--muted)">Returnare</span>
+							<span class="text-right" style="color: var(--text)">{c.loc_returnare.text}</span>
+						</div>
+						<div class="flex justify-between gap-3">
+							<span style="color: var(--muted)">Închiriere</span>
+							<span class="text-right" style="color: var(--text)">
+								{c.nr_zile} {c.nr_zile === 1 ? 'zi' : 'zile'} × {c.tarif_zi.toFixed(2)} lei
+							</span>
+						</div>
+						{#if c.taxa_loc > 0}
+							<div class="flex justify-between gap-3">
+								<span style="color: var(--muted)">Taxă preluare / returnare</span>
+								<span class="text-right" style="color: var(--text)">{c.taxa_loc.toFixed(2)} lei</span>
+							</div>
+						{/if}
+						{#if c.extras.length > 0}
+							<div class="pt-1.5 mt-1.5 border-t" style="border-color: var(--border);">
+								<p class="text-[11px] font-semibold uppercase tracking-wider mb-1" style="color: var(--muted)">Extras</p>
+								{#each c.extras as e (e.cod)}
+									<div class="flex justify-between text-xs">
+										<span style="color: var(--text)">· {e.label}</span>
+										<span style="color: var(--text)">{e.valoare.toFixed(2)} lei</span>
+									</div>
+								{/each}
+							</div>
+						{/if}
+						<div class="flex justify-between pt-2 mt-1 border-t" style="border-color: var(--border);">
+							<span class="font-bold" style="color: var(--text)">Total estimat</span>
+							<span class="font-bold text-base" style="color: var(--accent)">{c.cost_estimat.toFixed(2)} lei</span>
+						</div>
+						<p class="text-[11px] pt-1" style="color: var(--muted)">
+							Plata la ridicare. Te sunăm la {c.telefon || 'numărul din cont'} și confirmăm totul înainte.
+						</p>
+					</div>
+				{/if}
+
+				<div class="flex gap-2 px-4 pb-4 justify-center">
 					<a href="/dashboard/inchirieri/cererile-mele"
 						class="text-xs font-semibold px-4 py-2.5 rounded-xl"
 						style="background: var(--accent); color: white; text-decoration: none;">
@@ -422,9 +526,9 @@
 				<div class="hidden lg:block flex-1"></div>
 
 				<!-- CTA primary — apare doar pe wide screens (mobil are sticky footer) -->
-				<button onclick={() => { if (step !== 1) step = 1; document.getElementById('ds')?.focus(); }}
+				<button onclick={rezervaAcum}
 					class="cta-btn cta-btn-hero hidden lg:inline-flex relative w-full justify-center mt-4">
-					<span>Rezervă acum</span>
+					<span>{canGoStep3 ? 'Rezervă acum' : 'Alege perioada'}</span>
 					<span class="cta-arrow">→</span>
 				</button>
 				<p class="hidden lg:block relative text-[10px] text-center mt-2" style="color: var(--muted)">
@@ -432,6 +536,46 @@
 				</p>
 			</div>
 			</div><!-- /hero-grid -->
+
+			<!--
+				Bara perioadei — primul lucru sub mașină, pe orice ecran.
+				Perioada aleasă în listă ajungea aici doar ca parametru în URL: se
+				vedea abia dacă derulai până la calendar, iar răzgândirea se căuta
+				prin pași. Acum intervalul se citește de la prima privire și are
+				butonul lui de schimbat lângă el.
+			-->
+			<div class="interval-bar" style="--ac: {theme.accent};"
+				class:interval-gol={!canGoStep3}>
+				<span class="interval-icon" aria-hidden="true">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+				</span>
+
+				<div class="min-w-0 flex-1">
+					<p class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--muted)">
+						Perioada închirierii
+					</p>
+					{#if nrZile > 0}
+						<p class="text-sm font-bold leading-tight truncate" style="color: var(--text)">
+							{fmtDate(dataStart)} → {fmtDate(dataEnd)}
+							<span class="font-semibold" style="color: {theme.accent}">· {nrZile} {nrZile === 1 ? 'zi' : 'zile'}</span>
+						</p>
+					{:else}
+						<p class="text-sm font-semibold leading-tight" style="color: var(--text)">
+							Nu ai ales încă perioada
+						</p>
+					{/if}
+				</div>
+
+				<button type="button" onclick={schimbaDatele} class="interval-btn">
+					{nrZile > 0 ? 'Schimbă' : 'Alege'}
+				</button>
+			</div>
+
+			{#if intervalConflict}
+				<p class="text-xs px-1" style="color: #ef4444">
+					Mașina e deja rezervată în perioada asta — schimbă datele.
+				</p>
+			{/if}
 
 			<!-- Spec icon grid (full width sub hero) -->
 			<div class="grid grid-cols-4 sm:grid-cols-8 gap-2" style="--ac: {theme.accent};">
@@ -505,8 +649,8 @@
 				</div>
 			{/if}
 
-			<!-- Step content -->
-			<div class="p-4 rounded-2xl border space-y-3" style="background: var(--surface); border-color: var(--border);">
+			<!-- Step content — `id` ca butoanele de sus să poată aduce pasul în dreptul ochilor -->
+			<div id="pas" class="p-4 rounded-2xl border space-y-3" style="background: var(--surface); border-color: var(--border); scroll-margin-top: 12px;">
 				{#if step === 1}
 					<h2 class="font-bold text-base" style="color: var(--text)">Alege intervalul</h2>
 					<p class="text-xs" style="color: var(--muted)">Plata la ridicare. Te sunăm pentru confirmare.</p>
@@ -757,6 +901,55 @@
 		color: var(--muted);
 		border: 1px solid var(--border);
 	}
+
+	/* Bara perioadei — sub mașină, cu butonul de schimbat la capăt */
+	.interval-bar {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 10px 12px;
+		border-radius: 14px;
+		background: color-mix(in srgb, var(--ac) 8%, var(--surface));
+		border: 1px solid color-mix(in srgb, var(--ac) 32%, var(--border));
+	}
+	/* Fără interval ales, bara își arată golul: contur întrerupt, fără culoare. */
+	.interval-bar.interval-gol {
+		background: var(--surface);
+		border-style: dashed;
+		border-color: var(--border);
+	}
+	.interval-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px; height: 32px;
+		border-radius: 10px;
+		flex-shrink: 0;
+		background: color-mix(in srgb, var(--ac) 16%, transparent);
+		color: var(--ac);
+	}
+	.interval-gol .interval-icon {
+		background: var(--surface2);
+		color: var(--muted);
+	}
+	.interval-btn {
+		flex-shrink: 0;
+		font-size: 12px;
+		font-weight: 700;
+		padding: 8px 14px;
+		border-radius: 10px;
+		background: var(--surface2);
+		color: var(--text);
+		border: 1px solid var(--border);
+		cursor: pointer;
+		transition: border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+	}
+	.interval-btn:hover {
+		border-color: color-mix(in srgb, var(--ac) 60%, var(--border));
+		color: var(--ac);
+		transform: translateY(-1px);
+	}
+	.interval-btn:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
 
 	.spec-card {
 		display: flex;
