@@ -11,8 +11,10 @@
 		<meta name="apple-mobile-web-app-title" content="NLG Portal" />
 		<link rel="manifest" href="/manifest.webmanifest" />
 		<!-- Fără iconița asta, browserul cere singur /favicon.ico, care nu există
-		     → 404 la fiecare încărcare de pagină. -->
-		<link rel="icon" href="/icons/icon-192.png" />
+		     → 404 la fiecare încărcare de pagină. SVG-ul ține locul tuturor
+		     dimensiunilor, deci nu mai e nevoie de un PNG per mărime.
+		     apple-touch-icon rămâne PNG: iOS nu acceptă SVG acolo. -->
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 		<link rel="apple-touch-icon" href="/icons/icon-192.png" />
 		%sveltekit.head%
 	</head>
