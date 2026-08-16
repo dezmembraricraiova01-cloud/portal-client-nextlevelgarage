@@ -6,7 +6,8 @@
 	 * Componenta nu știe ce locuri există și nici cât costă — le primește.
 	 */
 
-	import type { LocInchiriere } from '$lib/api';
+	import { api, type LocInchiriere, type LocalitateGasita } from '$lib/api';
+	import Combobox from '$lib/components/Combobox.svelte';
 
 	let {
 		deschis = $bindable(false),
@@ -29,13 +30,16 @@
 
 	let ciornaTip = $state('sediu');
 	let ciornaAdresa = $state('');
-	let ciornaLocalitate = $state(0);
+	// `Combobox` lucrează cu `null` pentru „nimic ales", noi cu 0 — puntea stă
+	// aici, nu împrăștiată prin șablon.
+	let localitateSelectata = $state<number | null>(null);
+	const ciornaLocalitate = $derived(localitateSelectata ?? 0);
 
 	$effect(() => {
 		if (!deschis) return;
 		ciornaTip = tip;
 		ciornaAdresa = adresa;
-		ciornaLocalitate = localitateId;
+		localitateSelectata = localitateId || null;
 	});
 
 	const ales = $derived(locuri.find((l) => l.cod === ciornaTip) ?? null);
@@ -57,6 +61,74 @@
 		&& (!cereAdresa || ciornaAdresa.trim().length > 3)
 		&& (!cereLocalitate || !!localitateAleasa)
 	);
+
+	// ── Căutarea în nomenclator ──────────────────────────────────────────────
+	//
+	// Lista servită e mică și deja încărcată, deci se filtrează pe loc, fără
+	// rețea. Căutarea pe server intră peste ea ca să acopere restul țării: omul
+	// din Malu Mare trebuie să-și găsească comuna și să AFLE că nu ajungem încă
+	// acolo — „niciun rezultat" l-ar lăsa să creadă că a scris greșit.
+
+	let gasite = $state<LocalitateGasita[]>([]);
+	let cautaTimer: number | null = null;
+	let cautaSecventa = 0;
+
+	function faraDiacritice(s: string): string {
+		return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+	}
+
+	let textCautat = $state('');
+
+	function cauta(text: string) {
+		const q = text.trim();
+		textCautat = q;
+
+		if (cautaTimer) clearTimeout(cautaTimer);
+		if (q.length < 2) {
+			gasite = [];
+
+			return;
+		}
+
+		cautaTimer = setTimeout(async () => {
+			// Numărul de ordine face ca un răspuns întârziat la „mal" să nu mai
+			// suprascrie rezultatul proaspăt pentru „malu mare".
+			const al = ++cautaSecventa;
+			try {
+				const res = await api.inchirieriLocalitati(q, ciornaTip);
+				if (al === cautaSecventa) gasite = res.localitati;
+			} catch {
+				// Căutarea e un ajutor, nu o poartă: lista locală rămâne în picioare.
+				if (al === cautaSecventa) gasite = [];
+			}
+		}, 250) as unknown as number;
+	}
+
+	/** Ce vede omul în listă: întâi localitățile servite, apoi restul țării. */
+	const optiuniLocalitate = $derived.by(() => {
+		// Filtrarea locală o facem aici: `Combobox` o oprește când primește
+		// `onCauta`, altfel ar tăia din rezultatele venite de pe server.
+		const q = faraDiacritice(textCautat);
+		const servite = (ales?.localitati ?? [])
+			.filter((l) => !q || faraDiacritice(l.nume).includes(q))
+			.map((l) => ({
+				id: l.id,
+				nume: l.nume,
+				sub: `${l.km} km · ${l.pret} lei`
+			}));
+
+		const cunoscute = new Set(servite.map((s) => s.id));
+		const restul = gasite
+			.filter((g) => !g.servita && !cunoscute.has(g.id))
+			.map((g) => ({
+				id: g.id,
+				nume: g.nume,
+				sub: g.judet ? `${g.judet} · nu livrăm încă aici` : 'nu livrăm încă aici',
+				indisponibila: true
+			}));
+
+		return [...servite, ...restul];
+	});
 
 	function confirma() {
 		if (!gata) return;
@@ -127,24 +199,25 @@
 			</div>
 
 			{#if cereLocalitate}
-				<label class="block mt-3">
+				<div class="block mt-3">
 					<span class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--muted)">Localitatea</span>
 					{#if ales && ales.localitati.length > 0}
-						<select bind:value={ciornaLocalitate}
-							class="w-full mt-1 text-sm px-3 py-2.5 rounded-xl"
-							style="background: var(--surface2); border: 1px solid var(--border); color: var(--text);">
-							<option value={0}>Alege localitatea</option>
-							{#each ales.localitati as l (l.id)}
-								<option value={l.id}>{l.nume} · {l.km} km · {l.pret} lei</option>
-							{/each}
-						</select>
+						<div class="mt-1">
+							<Combobox
+								bind:value={localitateSelectata}
+								optiuni={optiuniLocalitate}
+								onCauta={cauta}
+								placeholder="Scrie localitatea — ex. Malu Mare"
+								golText="Nicio localitate cu numele ăsta"
+							/>
+						</div>
 					{:else}
 						<!-- Nicio localitate configurată: nu inventăm un preț, spunem adevărul. -->
 						<p class="mt-1 text-[12px] leading-snug" style="color: var(--muted)">
 							Nu avem încă tarife de livrare setate. Sună-ne și stabilim pe loc.
 						</p>
 					{/if}
-				</label>
+				</div>
 			{/if}
 
 			{#if cereAdresa}
