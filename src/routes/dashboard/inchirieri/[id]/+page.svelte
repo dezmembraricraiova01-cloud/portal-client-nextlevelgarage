@@ -121,6 +121,13 @@
 	let canGoStep3 = $derived(canGoStep2);
 	let canSubmit  = $derived(canGoStep2 && !saving);
 
+	/**
+	 * Bara fixă de jos apare abia când există o perioadă: până atunci repeta al
+	 * treilea „Alege perioada" de pe același ecran (hero, bară, footer). La Extras
+	 * și Confirmă rămâne mereu — duce totalul estimat și săgețile între pași.
+	 */
+	let baraJosVizibila = $derived(!formSuccess && (step > 1 || canGoStep2));
+
 	async function load() {
 		loading = true;
 		loadError = '';
@@ -295,8 +302,8 @@
 	onMount(load);
 </script>
 
-<!-- Spatiu cat navigatia PLUS bara de actiune, ca ultimul rand sa nu ramana dedesubt. -->
-<div class="space-y-4" style="padding-bottom: calc(var(--nav-h, 64px) + 96px);">
+<!-- Spatiu cat navigatia PLUS bara de actiune (cand e afisata), ca ultimul rand sa nu ramana dedesubt. -->
+<div class="space-y-4" style="padding-bottom: calc(var(--nav-h, 64px) + {baraJosVizibila ? '96px' : '16px'});">
 	<a href="/dashboard/inchirieri" class="inline-flex items-center gap-1.5 text-xs font-semibold"
 		style="color: var(--muted); text-decoration: none;">← Înapoi la flotă</a>
 
@@ -893,8 +900,8 @@
 			{/if}
 		{/if}
 
-		<!-- Sticky bottom action bar -->
-		{#if !formSuccess}
+		<!-- Sticky bottom action bar — doar cu perioada aleasă (vezi baraJosVizibila) -->
+		{#if baraJosVizibila}
 			<div class="sticky-action" style="--ac: {theme.accent};">
 				<div class="sticky-inner">
 					<div class="min-w-0">
@@ -915,18 +922,11 @@
 
 					<div class="flex items-center gap-2">
 						{#if step === 1}
-							<!-- Fără card la pasul 1, butonul stins ar fi un drum înfundat pe
-							     mobil (CTA-ul din card e doar pe ecrane late): fără date deschide
-							     calendarul, cu date duce mai departe. -->
-							{#if canGoStep2}
-								<button onclick={() => step = 2} class="cta-btn">
-									Continuă <span class="cta-arrow">→</span>
-								</button>
-							{:else}
-								<button onclick={schimbaDatele} class="cta-btn">
-									Alege perioada <span class="cta-arrow">→</span>
-								</button>
-							{/if}
+							<!-- Bara există la pasul 1 doar cu perioada aleasă, deci aici
+							     butonul duce mereu mai departe. -->
+							<button onclick={() => step = 2} class="cta-btn">
+								Continuă <span class="cta-arrow">→</span>
+							</button>
 						{:else if step === 2}
 							<button onclick={() => step = 1}
 								class="text-xs font-semibold px-3 py-2.5 rounded-xl"
