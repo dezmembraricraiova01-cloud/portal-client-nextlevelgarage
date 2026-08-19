@@ -4,6 +4,7 @@
 	import { api, type MasinaInchiriereDetaliu, type MasinaInchiriereCard, type IntervalBlocat, type InchiriereForm, type ExtraOferit, type LocInchiriere, type InchiriereCerere } from '$lib/api';
 	import Skeleton from '$lib/Skeleton.svelte';
 	import CalendarInterval from '$lib/components/CalendarInterval.svelte';
+	import { noteazaVazuta, rangVazuta } from '$lib/vazute';
 
 	let masina    = $state<MasinaInchiriereDetaliu | null>(null);
 	let blocate   = $state<IntervalBlocat[]>([]);
@@ -50,6 +51,8 @@
 	// Restul flotei, pentru banda „Alte mașini": răspunsul la „e ceva mai ieftin /
 	// mai mare?" vine în fișă, nu după o întoarcere la listă care pierdea perioada.
 	let alteMasiniBrute    = $state<MasinaInchiriereCard[]>([]);
+	/** Mașinile deschise în sesiunea asta, cele mai recente primele; [0] e mașina curentă. */
+	let vazute             = $state<number[]>([]);
 	let alteMasiniPerioada = $state(false); // prețurile din bandă sunt pe perioada aleasă, nu „de la"
 
 	let masinaId = $derived(Number(page.params.id));
@@ -340,8 +343,9 @@
 	 * Telefonul, observațiile și extrasele bifate rămân — sunt ale omului, nu ale mașinii.
 	 */
 	$effect(() => {
-		masinaId; // dependența: alt id, altă încărcare
+		const id = masinaId; // dependența: alt id, altă încărcare
 		untrack(() => {
+			vazute = noteazaVazuta(id);
 			pozaIdx = 0;
 			step = 1;
 			formSuccess = false;
@@ -384,13 +388,18 @@
 	}
 
 	/**
-	 * Ordinea benzii: aceeași clasă prima (alternativa directă), apoi cele libere
-	 * în perioadă, apoi cele ieftine. Derivat, nu calculat la răspuns: fișa și
-	 * flota se încarcă în paralel, iar clasa mașinii curente poate sosi a doua.
+	 * Ordinea benzii: mașinile deja deschise în sesiunea asta primele (ultima
+	 * văzută chiar prima — omul compară și se întoarce), apoi aceeași clasă
+	 * (alternativa directă), apoi cele libere în perioadă, apoi cele ieftine.
+	 * Derivat, nu calculat la răspuns: fișa și flota se încarcă în paralel, iar
+	 * clasa mașinii curente poate sosi a doua.
 	 */
 	let alteMasini = $derived.by(() => {
 		const clasaMea = masina?.clasa ?? null;
 		return [...alteMasiniBrute].sort((a, b) => {
+			const va = rangVazuta(vazute, a.id);
+			const vb = rangVazuta(vazute, b.id);
+			if (va !== vb) return va - vb;
 			const ca = a.clasa === clasaMea ? 0 : 1;
 			const cb = b.clasa === clasaMea ? 0 : 1;
 			if (ca !== cb) return ca - cb;
@@ -549,6 +558,11 @@
 									<span class="alta-chip" style="color: {t.chip}; border-color: {t.chipBorder}; background: color-mix(in srgb, {t.accent} 18%, rgba(13,13,34,0.85));">
 										{m.clasa_eticheta}
 									</span>
+								{/if}
+								<!-- Deja deschisă în sesiunea asta: stă prima și o spune. vazute[0] e
+								     mașina curentă, deci vazute[1] e ultima văzută înaintea ei. -->
+								{#if vazute.includes(m.id)}
+									<span class="alta-chip alta-vazuta">{vazute[1] === m.id ? 'Ultima văzută' : 'Văzută'}</span>
 								{/if}
 							</div>
 							<div class="alta-text">
@@ -1388,6 +1402,13 @@
 		border-radius: 5px;
 		border: 1px solid;
 		backdrop-filter: blur(6px);
+	}
+	/* „Văzută": pastila din dreapta-sus, neutră (alb pe sticlă), ca să nu se bată cu clasa din stânga. */
+	.alta-vazuta {
+		left: auto; right: 6px;
+		color: #fff;
+		border-color: rgba(255,255,255,0.28);
+		background: rgba(13,13,34,0.72);
 	}
 	.alta-text { padding: 8px 10px 9px; }
 	.alta-nume {

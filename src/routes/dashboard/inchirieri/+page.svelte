@@ -4,6 +4,7 @@
 	import Skeleton from '$lib/Skeleton.svelte';
 	import CalendarInterval from '$lib/components/CalendarInterval.svelte';
 	import LocPicker from '$lib/components/LocPicker.svelte';
+	import { citesteVazute, rangVazuta } from '$lib/vazute';
 
 	let masini       = $state<MasinaInchiriereCard[]>([]);
 	let locuri       = $state<LocInchiriere[]>([]);
@@ -16,6 +17,8 @@
 	let q            = $state('');
 	let combust      = $state('');
 	let clasaAleasa  = $state('');
+	/** Mașinile deschise în sesiunea asta (cele mai recente primele) — stau primele în listă, cu „Văzută". */
+	let vazute       = $state<number[]>([]);
 
 	// Date selection (înainte de a alege mașina)
 	let dataStart    = $state('');
@@ -121,8 +124,12 @@
 				if (pretMaxim > 0 && pretVizibil && pretVizibil > pretMaxim) return false;
 				return true;
 			})
-			// disponibilele primele când avem interval
+			// Mașinile deja deschise în sesiunea asta primele (ultima văzută chiar
+			// prima — omul compară și se întoarce), apoi disponibilele când avem interval.
 			.sort((a, b) => {
+				const va = rangVazuta(vazute, a.id);
+				const vb = rangVazuta(vazute, b.id);
+				if (va !== vb) return va - vb;
 				if (!intervalValid) return 0;
 				const da = a.disponibila_interval === false ? 1 : 0;
 				const db = b.disponibila_interval === false ? 1 : 0;
@@ -224,6 +231,7 @@
 	 * datele a doua oară. Un interval întors pe dos sau cu o dată lipsă e ignorat.
 	 */
 	onMount(() => {
+		vazute = citesteVazute();
 		const p = new URLSearchParams(window.location.search);
 		const from = p.get('from') ?? '';
 		const to   = p.get('to') ?? '';
@@ -540,12 +548,21 @@
 								{m.categoria}
 							</span>
 
-							{#if m.rezervari_azi > 0}
-								<span class="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
-									style="background: rgba(239,68,68,0.95); color: #fff; backdrop-filter: blur(6px);">
-									<span class="dot-pulse"></span>{m.rezervari_azi}×
-								</span>
-							{/if}
+							<span class="flex items-center gap-1 shrink-0">
+								<!-- Deja deschisă în sesiunea asta: stă prima în listă și o spune. -->
+								{#if vazute.includes(m.id)}
+									<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase"
+										style="background: rgba(13,13,34,0.72); color: #fff; border: 1px solid rgba(255,255,255,0.28); backdrop-filter: blur(6px); letter-spacing: 0.06em;">
+										{vazute[0] === m.id ? 'Ultima văzută' : 'Văzută'}
+									</span>
+								{/if}
+								{#if m.rezervari_azi > 0}
+									<span class="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
+										style="background: rgba(239,68,68,0.95); color: #fff; backdrop-filter: blur(6px);">
+										<span class="dot-pulse"></span>{m.rezervari_azi}×
+									</span>
+								{/if}
+							</span>
 						</div>
 
 						<!-- Bottom: marca + model overlay (numai dacă există poza) -->
