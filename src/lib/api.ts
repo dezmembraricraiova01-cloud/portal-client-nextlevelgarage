@@ -219,6 +219,8 @@ export const api = {
 
 	// Reparații
 	reparatii:     ()           => priv<Paginated<WorkOrder>>('GET', '/reparatii'),
+	/** Galeria de laudă a atelierului (Setări → Portal clienți în WMS) — pagina Reparații. */
+	serviceGalerie: () => priv<{ galerie: { url: string; titlu: string }[] }>('GET', '/service/galerie'),
 	reparatiiPage: (page: number) => priv<Paginated<WorkOrder>>('GET', `/reparatii?page=${page}`),
 	reparatie: (uid: string) =>
 		priv<{ wo: WorkOrder; timeline: TimelineStep[]; feedback: Feedback | null }>('GET', `/reparatii/${uid}`),
