@@ -1040,7 +1040,7 @@
 				fundalul închid fără să piardă nimic; pastila „Continuă" o redeschide.
 			-->
 			{#if fereastraDeschisa}
-			<button type="button" class="fereastra-fundal" onclick={inchideFereastra} aria-label="Închide fereastra"></button>
+			<button type="button" class="fundal-modal fereastra-fundal" onclick={inchideFereastra} aria-label="Închide fereastra"></button>
 			<div class="fereastra" role="dialog" aria-modal="true" aria-labelledby="fereastra-titlu" style="--ac: {theme.accent};">
 				<div class="fereastra-cap">
 					<div class="min-w-0">
@@ -1520,22 +1520,8 @@
 	   calendar (z 100), care se poate deschide PESTE ea din „schimbă". Centrată pe
 	   orice ecran, ca și calendarul; pe mobil ia aproape tot ecranul, cu corpul
 	   derulabil între antet și subsol — subsolul cu butoanele rămâne mereu la vedere. */
-	.fereastra-fundal {
-		position: fixed;
-		inset: 0;
-		z-index: 90;
-		border: 0;
-		cursor: default;
-		/* Blur SUBTIL (2px) sub un văl deschis: pagina din spate rămâne lizibilă,
-		   doar înmuiată și spălată — reglat de om pe mockup cu cursoare, nu ghicit.
-		   Același desen la calendar și LocPicker. */
-		background: rgba(226, 229, 240, 0.35);
-		backdrop-filter: blur(2px) saturate(1.05);
-		-webkit-backdrop-filter: blur(2px) saturate(1.05);
-		animation: fundalApare 0.18s ease-out;
-	}
-	@keyframes fundalApare { from { opacity: 0; } to { opacity: 1; } }
-	@media (prefers-reduced-motion: reduce) { .fereastra-fundal { animation: none; } }
+	/* Vălul vine din clasa globală `fundal-modal` (app.css); aici doar stratul. */
+	.fereastra-fundal { z-index: 90; }
 	.fereastra {
 		position: fixed;
 		z-index: 91;

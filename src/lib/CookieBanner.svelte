@@ -38,9 +38,8 @@
 				{ y: 100, opacity: 0 },
 				{ y: 0, opacity: 1, duration: 0.5, ease: 'power3.out' });
 		}
-		if (backdropEl && customize) {
-			gsap.fromTo(backdropEl, { opacity: 0 }, { opacity: 1, duration: 0.3 });
-		}
+		// Fundalul intră prin animația clasei globale `fundal-modal` (app.css);
+		// un al doilea fade din GSAP peste ea dădea o pâlpâire la 180ms.
 	}
 
 	async function close() {
@@ -60,8 +59,7 @@
 {#if visible}
 	{#if customize}
 		<div bind:this={backdropEl}
-			class="fixed inset-0 z-[180]"
-			style="background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);">
+			class="fundal-modal fixed inset-0 z-[180]">
 		</div>
 	{/if}
 

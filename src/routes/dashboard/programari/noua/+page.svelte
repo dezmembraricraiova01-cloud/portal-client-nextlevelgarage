@@ -519,7 +519,7 @@
 <!-- ═══════════════════════════════════════════════════ -->
 {#if modalOreOpen && dataSelectata}
 	<div
-		class="ore-overlay"
+		class="fundal-modal ore-overlay"
 		role="presentation"
 		onclick={inchideModalOre}>
 	</div>
@@ -733,13 +733,8 @@
 	}
 
 	/* === Bottom sheet alegere oră (nu acoperă calendarul) === */
-	.ore-overlay {
-		position: fixed;
-		inset: 0;
-		background: rgba(8, 8, 18, 0.18);
-		z-index: 60;
-		animation: oreFadeIn 0.18s ease-out;
-	}
+	/* Vălul vine din clasa globală `fundal-modal` (app.css); aici doar stratul. */
+	.ore-overlay { z-index: 60; }
 	.ore-modal {
 		position: fixed;
 		left: 50%;
@@ -772,10 +767,6 @@
 		background: rgba(255,255,255,0.18);
 		margin: 8px auto 0;
 	}
-	@keyframes oreFadeIn {
-		from { opacity: 0; }
-		to   { opacity: 1; }
-	}
 	@keyframes oreSheetIn {
 		from { transform: translate(-50%, 100%); }
 		to   { transform: translate(-50%, 0); }
@@ -783,7 +774,7 @@
 
 	@media (min-width: 900px) {
 		/* Pe desktop — card lateral dreapta, calendarul rămâne neacoperit */
-		.ore-overlay { background: transparent; }
+		.ore-overlay { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
 		.ore-modal {
 			left: auto;
 			right: 24px;

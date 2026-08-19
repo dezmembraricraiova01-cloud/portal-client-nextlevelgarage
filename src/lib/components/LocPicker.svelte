@@ -150,7 +150,7 @@
 {#if deschis}
 	<button
 		type="button"
-		class="fixed inset-0 z-[100] cursor-default loc-fundal"
+		class="fundal-modal fixed inset-0 z-[100]"
 		aria-label="Închide"
 		onclick={() => (deschis = false)}
 	></button>
@@ -264,23 +264,14 @@
 {/if}
 
 <style>
-	.loc-fundal {
-		/* Același blur ca la calendar și la fereastra de rezervare. */
-		background: rgba(226, 229, 240, 0.35);
-		backdrop-filter: blur(2px) saturate(1.05);
-		-webkit-backdrop-filter: blur(2px) saturate(1.05);
-		animation: apare 0.18s ease-out;
-	}
-
 	.loc-card {
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 		animation: creste 0.2s cubic-bezier(0.2, 0.7, 0.3, 1);
 	}
 
-	@keyframes apare { from { opacity: 0; } }
 	@keyframes creste { from { opacity: 0; transform: scale(0.94) translateY(8px); } }
 
 	@media (prefers-reduced-motion: reduce) {
-		.loc-fundal, .loc-card { animation: none; }
+		.loc-card { animation: none; }
 	}
 </style>

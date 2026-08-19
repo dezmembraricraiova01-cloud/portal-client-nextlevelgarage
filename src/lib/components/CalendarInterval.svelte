@@ -194,7 +194,7 @@
 {#if deschis}
 	<button
 		type="button"
-		class="fixed inset-0 z-[100] cursor-default cal-fundal"
+		class="fundal-modal fixed inset-0 z-[100]"
 		aria-label="Închide calendarul"
 		onclick={() => (deschis = false)}
 	></button>
@@ -304,15 +304,6 @@
 {/if}
 
 <style>
-	.cal-fundal {
-		/* Blur SUBTIL (2px) sub un văl deschis: pagina din spate rămâne lizibilă,
-		   doar înmuiată și spălată — același desen pe toate ferestrele. */
-		background: rgba(226, 229, 240, 0.35);
-		backdrop-filter: blur(2px) saturate(1.05);
-		-webkit-backdrop-filter: blur(2px) saturate(1.05);
-		animation: apare 0.18s ease-out;
-	}
-
 	.cal-card {
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 		animation: creste 0.2s cubic-bezier(0.2, 0.7, 0.3, 1);
@@ -335,10 +326,9 @@
 	.zi-stanga { border-radius: 999px 0 0 999px; }
 	.zi-dreapta { border-radius: 0 999px 999px 0; }
 
-	@keyframes apare { from { opacity: 0; } }
 	@keyframes creste { from { opacity: 0; transform: scale(0.96) translateY(8px); } }
 
 	@media (prefers-reduced-motion: reduce) {
-		.cal-fundal, .cal-card { animation: none; }
+		.cal-card { animation: none; }
 	}
 </style>

@@ -33,7 +33,8 @@
 
 	$effect(() => {
 		if (visible && panelEl && backdropEl) {
-			gsap.fromTo(backdropEl, { opacity: 0 }, { opacity: 1, duration: 0.25 });
+			// Fundalul intră prin animația clasei globale `fundal-modal` (app.css);
+			// un al doilea fade din GSAP peste ea dădea o pâlpâire la 180ms.
 			gsap.fromTo(panelEl,
 				{ y: 60, opacity: 0, scale: 0.95 },
 				{ y: 0, opacity: 1, scale: 1, duration: 0.4, ease: 'power3.out' });
@@ -63,8 +64,7 @@
 
 {#if visible && status}
 	<div bind:this={backdropEl}
-		class="fixed inset-0 z-[200]"
-		style="background: rgba(0,0,0,0.78); backdrop-filter: blur(6px);">
+		class="fundal-modal fixed inset-0 z-[200]">
 	</div>
 
 	<div class="fixed inset-0 z-[201] flex items-end sm:items-center justify-center px-3 py-3 overflow-y-auto">

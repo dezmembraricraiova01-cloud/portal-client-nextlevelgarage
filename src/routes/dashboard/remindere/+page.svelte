@@ -963,7 +963,7 @@
 <!-- Bottom sheet / side card pentru editare alertă -->
 <!-- ═══════════════════════════════════════════════════ -->
 {#if editOpen}
-	<div class="alerta-overlay" role="presentation" onclick={closeEdit}></div>
+	<div class="fundal-modal alerta-overlay" role="presentation" onclick={closeEdit}></div>
 	<div class="alerta-modal" role="dialog" aria-modal="true" aria-label="Editare alertă">
 		<button type="button" onclick={closeEdit}
 			class="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all z-10"
@@ -1053,13 +1053,8 @@
 {/if}
 
 <style>
-	.alerta-overlay {
-		position: fixed;
-		inset: 0;
-		background: rgba(8, 8, 18, 0.18);
-		z-index: 60;
-		animation: alertaFadeIn 0.18s ease-out;
-	}
+	/* Vălul vine din clasa globală `fundal-modal` (app.css); aici doar stratul. */
+	.alerta-overlay { z-index: 60; }
 	.alerta-modal {
 		position: fixed;
 		left: 50%;
@@ -1099,10 +1094,6 @@
 		scrollbar-width: none;
 	}
 	.alerta-modal-body::-webkit-scrollbar { display: none; }
-	@keyframes alertaFadeIn {
-		from { opacity: 0; }
-		to   { opacity: 1; }
-	}
 	@keyframes alertaSheetIn {
 		from { transform: translate(-50%, 100%); }
 		to   { transform: translate(-50%, 0); }

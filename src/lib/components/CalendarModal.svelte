@@ -85,7 +85,7 @@
 	<!-- Fundal estompat -->
 	<button
 		type="button"
-		class="fixed inset-0 z-[100] cursor-default modal-fundal"
+		class="fundal-modal fixed inset-0 z-[100]"
 		aria-label="Închide calendarul"
 		onclick={() => (deschis = false)}
 	></button>
@@ -175,22 +175,14 @@
 {/if}
 
 <style>
-	.modal-fundal {
-		background: rgba(8, 10, 18, 0.55);
-		backdrop-filter: blur(6px);
-		-webkit-backdrop-filter: blur(6px);
-		animation: apare 0.18s ease-out;
-	}
-
 	.modal-card {
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 		animation: creste 0.2s cubic-bezier(0.2, 0.7, 0.3, 1);
 	}
 
-	@keyframes apare { from { opacity: 0; } }
 	@keyframes creste { from { opacity: 0; transform: scale(0.94) translateY(8px); } }
 
 	@media (prefers-reduced-motion: reduce) {
-		.modal-fundal, .modal-card { animation: none; }
+		.modal-card { animation: none; }
 	}
 </style>
