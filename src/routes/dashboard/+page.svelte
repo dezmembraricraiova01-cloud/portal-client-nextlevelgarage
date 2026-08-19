@@ -14,12 +14,37 @@
 	let loading       = $state(true);
 	let alerteUrgente = $state<AlertaMasinaFull[]>([]);
 
+	/**
+	 * Vitrina din bannerul de închirieri: câte mașini, de la ce preț, trei poze.
+	 * „Ai nevoie de o mașină?" pe un gradient gol putea însemna orice, inclusiv
+	 * vânzare; prețul PE ZI și pozele reale spun singure că e închiriere.
+	 * Se încarcă separat și pică tăcut: fără ea bannerul rămâne pe text.
+	 */
+	let flota = $state<{ nr: number; pretMin: number; poze: string[]; kmToate: boolean } | null>(null);
+
+	/** „29 de mașini", dar „19 mașini" — numeralul românesc cere „de" abia de la 20. */
+	const numarMasini = (n: number) => n === 1 ? 'o mașină' : `${n} ${n < 20 ? 'mașini' : 'de mașini'}`;
+
 	function zileRamase(iso: string | null): number {
 		if (!iso) return 999;
 		return Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
 	}
 
 	onMount(async () => {
+		// Vitrina bannerului — în afara try-ului de mai jos: eșecul ei nu trimite
+		// la login, doar lasă bannerul fără poze și cifre.
+		api.inchirieriFlota()
+			.then((res) => {
+				flota = {
+					nr:      res.masini.length,
+					pretMin: res.preturi?.min ?? 0,
+					poze:    res.masini.filter((m) => m.foto_url).slice(0, 3).map((m) => m.foto_url as string),
+					// „Km nelimitați" se afișează doar dacă e adevărat pentru TOATĂ flota.
+					kmToate: res.masini.length > 0 && res.masini.every((m) => m.km_nelimitati),
+				};
+			})
+			.catch(() => {});
+
 		try {
 			const [dashRes, alerteRes] = await Promise.all([
 				api.dashboard(),
@@ -423,25 +448,44 @@
 
 			<!-- ③ Acțiunea principală — eliminata (redundant cu hero status) -->
 
-		<!-- ④ CTA închiriere — buton "Ce mașină vrei să închiriezi?" -->
+		<!-- ④ CTA închiriere — vitrină, nu doar îndemn: „Ai nevoie de o mașină?" pe
+		     un gradient gol putea însemna orice, inclusiv vânzare. Titlul spune
+		     verbul, prețul PE ZI spune singur că e închiriere, pozele reale arată
+		     flota. Cifrele vin din API; până sosesc (sau dacă pică apelul), bannerul
+		     stă pe text, cu orbul de azi în locul pozelor. -->
 		<a href="/dashboard/inchirieri" data-tour="inchirieri" data-reveal data-delay="0.1"
 			class="rental-cta group relative block rounded-2xl overflow-hidden transition-all active:scale-[0.985]">
 			<div class="rental-aurora absolute inset-0 pointer-events-none"></div>
 			<div class="rental-shimmer absolute inset-0 pointer-events-none"></div>
 
 			<div class="relative px-4 py-3.5 flex items-center gap-3">
-				<div class="rental-orb shrink-0 flex items-center justify-center text-2xl">🚙</div>
+				{#if flota && flota.poze.length > 0}
+					<span class="rental-poze shrink-0" aria-hidden="true">
+						{#each flota.poze as p, i (p)}
+							<!-- A treia poză n-are loc pe îngust: hidden + sm:grid. -->
+							<span class="rental-poza {i === 2 ? 'hidden sm:grid' : ''}">
+								<img src={p} alt="" loading="lazy" />
+							</span>
+						{/each}
+						{#if flota.nr > flota.poze.length}
+							<span class="rental-plus">+{flota.nr - flota.poze.length}</span>
+						{/if}
+					</span>
+				{:else}
+					<div class="rental-orb shrink-0 flex items-center justify-center text-2xl">🚙</div>
+				{/if}
+
 				<div class="flex-1 min-w-0">
 					<p class="font-bold text-[15px] leading-tight tracking-tight" style="color: #fff">
-						Ai nevoie de o mașină?
+						Închiriază o mașină{#if flota && flota.pretMin > 0}
+							<span class="rental-pret">de la {flota.pretMin} lei/zi</span>{/if}
 					</p>
-					<p class="text-xs mt-0.5 leading-snug" style="color: rgba(255,255,255,0.78)">
-						Vezi flota și rezervă rapid — te sunăm pentru confirmare.
+					<p class="hidden sm:block text-xs mt-0.5 leading-snug" style="color: rgba(255,255,255,0.82)">
+						{#if flota}{numarMasini(flota.nr)} · {/if}{#if flota?.kmToate}km nelimitați · {/if}CASCO inclusă · plata la ridicare
 					</p>
 				</div>
-				<span class="shrink-0 inline-flex items-center gap-1 text-xs font-bold px-3 py-2 rounded-xl"
-					style="background: rgba(255,255,255,0.18); color: #fff; border: 1px solid rgba(255,255,255,0.28); backdrop-filter: blur(6px);">
-					<span>Vezi flota</span>
+				<span class="rental-go shrink-0 inline-flex items-center gap-1 text-xs font-extrabold px-3 py-2 rounded-xl">
+					<span>Alege mașina</span>
 					<span class="rental-arrow">→</span>
 				</span>
 			</div>
@@ -801,6 +845,49 @@
 		transition: transform 0.25s ease;
 	}
 	.rental-cta:hover .rental-arrow { transform: translateX(3px); }
+
+	/* Vitrina din banner: poze reale suprapuse (ca avatarurile) + pastila „+N". */
+	.rental-poze { display: flex; align-items: center; }
+	.rental-poza {
+		width: 64px; height: 44px;
+		border-radius: 10px;
+		overflow: hidden;
+		display: grid;
+		margin-left: -16px;
+		border: 2px solid rgba(255,255,255,0.85);
+		background: rgba(13,13,34,0.5);
+		box-shadow: 0 4px 14px -4px rgba(0,0,0,0.5);
+	}
+	.rental-poza:first-child { margin-left: 0; }
+	.rental-poza img { width: 100%; height: 100%; object-fit: cover; }
+	.rental-plus {
+		margin-left: -12px;
+		z-index: 1;
+		width: 36px; height: 36px;
+		border-radius: 50%;
+		display: grid; place-items: center;
+		font-size: 11px; font-weight: 800;
+		color: #fff;
+		background: rgba(13,13,34,0.75);
+		border: 2px solid rgba(255,255,255,0.85);
+	}
+	/* Prețul pe zi — pastila verde care spune singură că e închiriere, nu vânzare. */
+	.rental-pret {
+		display: inline-block;
+		font-size: 12px; font-weight: 800;
+		color: #10241c;
+		background: #6ee7b7;
+		padding: 3px 8px;
+		border-radius: 999px;
+		margin-left: 8px;
+		vertical-align: 2px;
+		white-space: nowrap;
+	}
+	.rental-go {
+		background: #fff;
+		color: #1d1d2e;
+		box-shadow: 0 8px 22px -8px rgba(0,0,0,0.5);
+	}
 
 	@media (prefers-reduced-motion: reduce) {
 		.rental-aurora, .rental-shimmer { animation: none; }
