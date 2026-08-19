@@ -266,9 +266,9 @@
 <style>
 	.loc-fundal {
 		/* Același blur ca la calendar și la fereastra de rezervare. */
-		background: rgba(8, 10, 18, 0.42);
-		backdrop-filter: blur(14px) saturate(1.1);
-		-webkit-backdrop-filter: blur(14px) saturate(1.1);
+		background: rgba(226, 229, 240, 0.35);
+		backdrop-filter: blur(2px) saturate(1.05);
+		-webkit-backdrop-filter: blur(2px) saturate(1.05);
 		animation: apare 0.18s ease-out;
 	}
 

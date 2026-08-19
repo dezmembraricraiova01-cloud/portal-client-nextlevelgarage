@@ -1526,11 +1526,12 @@
 		z-index: 90;
 		border: 0;
 		cursor: default;
-		/* Blur puternic pe toată pagina din spate, văl mai subțire: fereastra
-		   rămâne crocantă, restul se topește — ca la calendar și LocPicker. */
-		background: rgba(8, 10, 18, 0.42);
-		backdrop-filter: blur(14px) saturate(1.1);
-		-webkit-backdrop-filter: blur(14px) saturate(1.1);
+		/* Blur SUBTIL (2px) sub un văl deschis: pagina din spate rămâne lizibilă,
+		   doar înmuiată și spălată — reglat de om pe mockup cu cursoare, nu ghicit.
+		   Același desen la calendar și LocPicker. */
+		background: rgba(226, 229, 240, 0.35);
+		backdrop-filter: blur(2px) saturate(1.05);
+		-webkit-backdrop-filter: blur(2px) saturate(1.05);
 		animation: fundalApare 0.18s ease-out;
 	}
 	@keyframes fundalApare { from { opacity: 0; } to { opacity: 1; } }
@@ -1547,7 +1548,8 @@
 		border-radius: 20px;
 		background: var(--surface);
 		border: 1px solid var(--border);
-		box-shadow: 0 30px 80px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.04) inset;
+		/* Pe vălul deschis, marginea ferestrei are nevoie de un inel întunecat ca să se citească. */
+		box-shadow: 0 30px 80px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.28);
 	}
 	.fereastra-cap {
 		display: flex;

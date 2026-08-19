@@ -305,11 +305,11 @@
 
 <style>
 	.cal-fundal {
-		/* Blur puternic pe toată pagina din spate, văl mai subțire: fereastra
-		   rămâne crocantă, restul se topește — același desen pe toate ferestrele. */
-		background: rgba(8, 10, 18, 0.42);
-		backdrop-filter: blur(14px) saturate(1.1);
-		-webkit-backdrop-filter: blur(14px) saturate(1.1);
+		/* Blur SUBTIL (2px) sub un văl deschis: pagina din spate rămâne lizibilă,
+		   doar înmuiată și spălată — același desen pe toate ferestrele. */
+		background: rgba(226, 229, 240, 0.35);
+		backdrop-filter: blur(2px) saturate(1.05);
+		-webkit-backdrop-filter: blur(2px) saturate(1.05);
 		animation: apare 0.18s ease-out;
 	}
 
