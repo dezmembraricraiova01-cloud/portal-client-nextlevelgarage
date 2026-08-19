@@ -39,6 +39,8 @@
 	let calendarDeschis = $state(false);
 	/** Calendarul s-a deschis din butonul de rezervare, deci drumul continuă spre sumar. */
 	let intervalCerutDinCta = $state(false);
+	/** Calendarul s-a deschis singur la intrare (fișă fără perioadă în URL); după alegere se continuă la Extras. */
+	let intervalCerutLaIntrare = $state(false);
 
 	// Cererea așa cum a înregistrat-o serverul. Recapitularea de la final se face
 	// din ea, nu din calculele de aici: omul trebuie să vadă ce s-a scris în
@@ -196,6 +198,13 @@
 				const s = new Date(dataStart).getTime();
 				const e = new Date(dataEnd).getTime();
 				if (e > s && !intervalConflict) step = 2; // sare direct la Extras
+			} else {
+				// Fără perioadă nu se ajunge la mașini: lista cere datele înainte să
+				// arate flota, iar un link direct (vechi, bookmark, trimis de cineva)
+				// primește calendarul la intrare. După alegere drumul continuă la
+				// Extras, ca pentru cine vine din listă cu datele în URL.
+				intervalCerutLaIntrare = true;
+				calendarDeschis = true;
 			}
 		} catch (e: any) {
 			loadError = e.status === 404
@@ -238,10 +247,13 @@
 	 */
 	$effect(() => {
 		if (calendarDeschis || step !== 1 || !canGoStep3) return;
-		if (!intervalCerutDinCta) return;
-
-		intervalCerutDinCta = false;
-		mergiLaPas(3);
+		if (intervalCerutDinCta) {
+			intervalCerutDinCta = false;
+			mergiLaPas(3);
+		} else if (intervalCerutLaIntrare) {
+			intervalCerutLaIntrare = false;
+			mergiLaPas(2);
+		}
 	});
 
 	/**
@@ -337,6 +349,7 @@
 			cerereTrimisa = null;
 			calendarDeschis = false;
 			intervalCerutDinCta = false;
+			intervalCerutLaIntrare = false;
 			dataStart = '';
 			dataEnd = '';
 			load();
@@ -429,6 +442,55 @@
 		const q = p.toString();
 		return `/dashboard/inchirieri${q ? `?${q}` : ''}`;
 	});
+
+	/**
+	 * Săgețile și contorul benzii „Alte mașini" — acțiune pe DOM, nu stare Svelte.
+	 * Snippet-ul e randat de două ori (desktop/mobil) și fiecare instanță își
+	 * numără singură cardurile din vedere; un bind:this le-ar lega pe amândouă de
+	 * aceeași variabilă. Contorul e pur geometric (câte carduri încap în lățime),
+	 * nu stare de aplicație, deci n-are ce căuta în $state.
+	 */
+	function bandaNav(wrap: HTMLElement, _cheie: number) {
+		const scroll = wrap.querySelector<HTMLElement>('.alte-scroll');
+		const count  = wrap.querySelector<HTMLElement>('[data-count]');
+		const prev   = wrap.querySelector<HTMLButtonElement>('[data-prev]');
+		const next   = wrap.querySelector<HTMLButtonElement>('[data-next]');
+		if (!scroll || !count || !prev || !next) return;
+
+		const GAP = 10; // gap-ul din .alte-scroll
+		const lin = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+
+		const refresh = () => {
+			const n = scroll.children.length;
+			if (!n || !scroll.clientWidth) { count.textContent = ''; return; }
+			const w        = (scroll.children[0] as HTMLElement).offsetWidth + GAP;
+			const pePagina = Math.max(1, Math.floor((scroll.clientWidth + GAP) / w));
+			const prima    = Math.min(n, Math.round(scroll.scrollLeft / w) + 1);
+			const ultima   = Math.min(n, prima + pePagina - 1);
+			count.textContent = `${prima === ultima ? prima : `${prima}–${ultima}`} din ${n}`;
+			prev.disabled = scroll.scrollLeft <= 2;
+			next.disabled = scroll.scrollLeft + scroll.clientWidth >= scroll.scrollWidth - 2;
+		};
+		const inapoi  = () => scroll.scrollBy({ left: -scroll.clientWidth, behavior: lin() });
+		const inainte = () => scroll.scrollBy({ left:  scroll.clientWidth, behavior: lin() });
+
+		prev.addEventListener('click', inapoi);
+		next.addEventListener('click', inainte);
+		scroll.addEventListener('scroll', refresh, { passive: true });
+		const ro = new ResizeObserver(refresh);
+		ro.observe(scroll);
+		refresh();
+
+		return {
+			update() { requestAnimationFrame(refresh); }, // lista s-a schimbat (altă mașină, altă perioadă)
+			destroy() {
+				prev.removeEventListener('click', inapoi);
+				next.removeEventListener('click', inainte);
+				scroll.removeEventListener('scroll', refresh);
+				ro.disconnect();
+			}
+		};
+	}
 </script>
 
 <!-- Spatiu cat navigatia PLUS bara de actiune (cand e afisata), ca ultimul rand sa nu ramana dedesubt. -->
@@ -452,14 +514,21 @@
 			Cardurile poartă perioada și locurile mai departe (urlAltaMasina).
 		-->
 		{#snippet bandaAlteMasini()}
-			<div class="alte-masini">
+			<div class="alte-masini" use:bandaNav={alteMasini.length}>
 				<div class="flex items-center justify-between gap-2 mb-2">
-					<p class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--muted)">
+					<p class="text-[10px] font-bold uppercase tracking-wider min-w-0 truncate" style="color: var(--muted)">
 						Alte mașini {alteMasiniPerioada ? 'pentru perioada ta' : 'din flotă'}
-						<span class="font-semibold" style="opacity: 0.7;">· {alteMasini.length}</span>
 					</p>
-					<a href={urlFlota} class="text-[10px] font-bold uppercase tracking-wider shrink-0"
-						style="color: var(--muted); text-decoration: none;">Toată flota →</a>
+					<!-- Săgeți + contor „1–4 din 7": ce e în vedere din câte sunt. Degetul
+					     derulează în continuare; săgețile sunt pentru mouse și pentru
+					     cine vrea să știe cât a văzut. -->
+					<div class="alte-nav">
+						<a href={urlFlota} class="text-[10px] font-bold uppercase tracking-wider shrink-0"
+							style="color: var(--muted); text-decoration: none;">Toată flota →</a>
+						<span class="alte-count" data-count aria-live="polite"></span>
+						<button type="button" class="alte-arrow" data-prev aria-label="Mașinile dinainte">‹</button>
+						<button type="button" class="alte-arrow" data-next aria-label="Mașinile următoare">›</button>
+					</div>
 				</div>
 				<div class="alte-scroll">
 					{#each alteMasini as m (m.id)}
@@ -500,32 +569,28 @@
 			</div>
 		{/snippet}
 
-		<!-- Step indicator (4 pași: Vehicul ✓ · Date · Extras · Confirmă)
-		     Pașii sunt APĂSABILI: bifa ✓ promite că te poți întoarce, iar înainte
-		     se putea doar din săgeată, câte un pas. Datele rămân completate. -->
-		<div class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider overflow-x-auto">
-			<a href={urlFlota} class="step-dot step-done" style="text-decoration: none;" aria-label="Înapoi la flotă">✓</a>
-			<a href={urlFlota} style="color: var(--muted); text-decoration: none;" class="hidden sm:inline uppercase tracking-wider">Vehicul</a>
-			<span class="flex-1 h-px min-w-[12px]" style="background: var(--border)"></span>
-
+		<!-- Step indicator (4 pași: Vehicul ✓ · Date · Extras · Confirmă) — săgeți
+		     una-n alta: vârful fiecărui pas intră în scobitura următorului, în loc
+		     de buline legate cu o linie. Pașii sunt APĂSABILI: bifa ✓ promite că te
+		     poți întoarce. Pe ecrane înguste eticheta rămâne doar la pasul activ. -->
+		<nav class="steps" aria-label="Pașii rezervării">
+			<a href={urlFlota} class="step step-done" aria-label="Înapoi la flotă">
+				<b>✓</b><span class="step-lbl">Vehicul</span>
+			</a>
 			<!-- „Date" deschide calendarul: pasul n-are panou propriu, perioada se alege din cardul de tarif. -->
 			<button type="button" onclick={schimbaDatele} aria-current={step === 1 ? 'step' : undefined}
-				class="step-dot {step === 1 ? 'step-active' : 'step-done'}" aria-label="Schimbă datele">{step > 1 ? '✓' : '2'}</button>
-			<button type="button" onclick={schimbaDatele} style="color: {step === 1 ? 'var(--text)' : 'var(--muted)'}"
-				class="uppercase tracking-wider">Date</button>
-			<span class="flex-1 h-px min-w-[12px]" style="background: var(--border)"></span>
-
+				class="step {step === 1 ? 'step-active' : 'step-done'}" aria-label="Schimbă datele">
+				<b>{step > 1 ? '✓' : '2'}</b><span class="step-lbl">Date</span>
+			</button>
 			<button type="button" onclick={() => canGoStep2 && (step = 2)} disabled={!canGoStep2} aria-current={step === 2 ? 'step' : undefined}
-				class="step-dot {step === 2 ? 'step-active' : (step > 2 ? 'step-done' : 'step-pending')}" aria-label="Servicii suplimentare">{step > 2 ? '✓' : '3'}</button>
-			<button type="button" onclick={() => canGoStep2 && (step = 2)} disabled={!canGoStep2}
-				style="color: {step === 2 ? 'var(--text)' : 'var(--muted)'}" class="uppercase tracking-wider disabled:opacity-60">Extras</button>
-			<span class="flex-1 h-px min-w-[12px]" style="background: var(--border)"></span>
-
+				class="step {step === 2 ? 'step-active' : (step > 2 ? 'step-done' : 'step-pending')}" aria-label="Servicii suplimentare">
+				<b>{step > 2 ? '✓' : '3'}</b><span class="step-lbl">Extras</span>
+			</button>
 			<button type="button" onclick={() => canGoStep3 && (step = 3)} disabled={!canGoStep3} aria-current={step === 3 ? 'step' : undefined}
-				class="step-dot {step === 3 ? 'step-active' : 'step-pending'}" aria-label="Confirmă rezervarea">4</button>
-			<button type="button" onclick={() => canGoStep3 && (step = 3)} disabled={!canGoStep3}
-				style="color: {step === 3 ? 'var(--text)' : 'var(--muted)'}" class="uppercase tracking-wider disabled:opacity-60">Confirmă</button>
-		</div>
+				class="step {step === 3 ? 'step-active' : 'step-pending'}" aria-label="Confirmă rezervarea">
+				<b>4</b><span class="step-lbl">Confirmă</span>
+			</button>
+		</nav>
 
 		{#if formSuccess}
 			<!--
@@ -1060,86 +1125,129 @@
 			{/if}
 		{/if}
 
-		<!-- Sticky bottom action bar — doar cu perioada aleasă (vezi baraJosVizibila) -->
+		<!-- Butonul plutitor — doar cu perioada aleasă (vezi baraJosVizibila).
+		     Era o bară pe toată lățimea, peste care cădea bula de chat din colțul
+		     dreapta-jos și acoperea „Continuă". Acum e o pastilă: centrată pe ecrane
+		     late, lipită de stânga pe mobil, cu coloana bulei lăsată liberă. -->
 		{#if baraJosVizibila}
-			<div class="sticky-action" style="--ac: {theme.accent};">
-				<div class="sticky-inner">
-					<div class="min-w-0">
-						{#if nrZile > 0}
-							<p class="text-[11px] font-semibold uppercase tracking-wider" style="color: var(--muted)">
-								{nrZile} {nrZile === 1 ? 'zi' : 'zile'} estimate
-							</p>
-							<p class="text-lg font-bold leading-tight" style="color: var(--text)">
-								{costEstimat.toFixed(2)} <span class="text-xs font-normal" style="color: var(--muted)">lei</span>
-							</p>
-						{:else}
-							<p class="text-[11px] font-semibold uppercase tracking-wider" style="color: var(--muted)">
-								{tarifAfisat ? `de la ${tarifAfisat.toFixed(0)} lei/zi` : 'tarif la cerere'}
-							</p>
-							<p class="text-sm font-medium" style="color: var(--text)">Alege intervalul</p>
-						{/if}
-					</div>
+			<div class="fab-cta" style="--ac: {theme.accent};">
+				{#if step > 1}
+					<button type="button" onclick={() => step = step === 3 ? 2 : 1} class="fab-back" aria-label="Pasul anterior">←</button>
+				{/if}
 
-					<div class="flex items-center gap-2">
-						{#if step === 1}
-							<!-- Bara există la pasul 1 doar cu perioada aleasă, deci aici
-							     butonul duce mereu mai departe. -->
-							<button onclick={() => step = 2} class="cta-btn">
-								Continuă <span class="cta-arrow">→</span>
-							</button>
-						{:else if step === 2}
-							<button onclick={() => step = 1}
-								class="text-xs font-semibold px-3 py-2.5 rounded-xl"
-								style="background: var(--surface2); color: var(--text); border: 1px solid var(--border);">←</button>
-							<button onclick={() => step = 3} disabled={!canGoStep3} class="cta-btn">
-								{extraseAlese.length === 0 ? 'Sari peste' : 'Continuă'} <span class="cta-arrow">→</span>
-							</button>
-						{:else}
-							<button onclick={() => step = 2}
-								class="text-xs font-semibold px-3 py-2.5 rounded-xl"
-								style="background: var(--surface2); color: var(--text); border: 1px solid var(--border);">←</button>
-							<button onclick={rezerva} disabled={!canSubmit}
-								class="cta-btn"
-								class:cta-disabled={!canSubmit}>
-								{saving ? 'Se trimite...' : 'Trimite cererea'} <span class="cta-arrow">→</span>
-							</button>
-						{/if}
-					</div>
+				<div class="min-w-0 leading-tight">
+					{#if nrZile > 0}
+						<p class="text-[10px] font-bold uppercase tracking-wider truncate" style="color: var(--muted)">
+							{nrZile} {nrZile === 1 ? 'zi' : 'zile'} estimate
+						</p>
+						<p class="text-[15px] font-extrabold tabular-nums" style="color: var(--text)">
+							{costEstimat.toFixed(2)} <span class="text-[10px] font-medium" style="color: var(--muted)">lei</span>
+						</p>
+					{:else}
+						<p class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--muted)">
+							{tarifAfisat ? `de la ${tarifAfisat.toFixed(0)} lei/zi` : 'tarif la cerere'}
+						</p>
+						<p class="text-sm font-semibold" style="color: var(--text)">Alege intervalul</p>
+					{/if}
 				</div>
+
+				{#if step === 1}
+					<!-- Pastila există la pasul 1 doar cu perioada aleasă, deci butonul duce mereu mai departe. -->
+					<button onclick={() => step = 2} class="cta-btn fab-go">
+						Continuă <span class="cta-arrow">→</span>
+					</button>
+				{:else if step === 2}
+					<button onclick={() => step = 3} disabled={!canGoStep3} class="cta-btn fab-go">
+						{extraseAlese.length === 0 ? 'Sari peste' : 'Continuă'} <span class="cta-arrow">→</span>
+					</button>
+				{:else}
+					<button onclick={rezerva} disabled={!canSubmit}
+						class="cta-btn fab-go"
+						class:cta-disabled={!canSubmit}>
+						{saving ? 'Se trimite...' : 'Trimite cererea'} <span class="cta-arrow">→</span>
+					</button>
+				{/if}
 			</div>
 		{/if}
 	{/if}
 </div>
 
 <style>
-	.step-dot {
-		width: 22px; height: 22px;
-		display: inline-flex; align-items: center; justify-content: center;
-		border-radius: 50%;
-		font-size: 11px;
+	/* Stepper cu săgeți una-n alta. Fiecare pas e o săgeată plată decupată cu
+	   clip-path: vârful din dreapta intră în scobitura din stânga a următorului
+	   (margin-left negativ). Făcut = verde stins, activ = accent plin, de venit = gri. */
+	.steps {
+		display: flex;
+		align-items: stretch;
+		height: 30px;
+	}
+	.step {
+		position: relative;
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		padding: 0 12px 0 24px;
+		margin-left: -10px;
+		font-size: 10px;
 		font-weight: 700;
-		flex-shrink: 0;
-		/* Sunt butoane acum, nu span-uri: le ținem înfățișarea, dar arătăm că se apasă. */
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		text-decoration: none;
+		white-space: nowrap;
+		color: var(--muted);
+		background: var(--surface2);
 		border: none;
 		cursor: pointer;
-		transition: transform 0.15s ease, opacity 0.15s ease;
+		clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%, 13px 50%);
+		transition: filter 0.15s ease;
 	}
-	.step-dot:disabled { cursor: default; }
-	.step-dot:not(:disabled):hover { transform: scale(1.08); }
-	.step-dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.step:first-child {
+		margin-left: 0;
+		padding-left: 14px;
+		border-radius: 8px 0 0 8px;
+		clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%);
+	}
+	.step:last-child {
+		border-radius: 0 8px 8px 0;
+		clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 13px 50%);
+	}
+	.step b {
+		width: 18px; height: 18px;
+		border-radius: 50%;
+		display: inline-grid; place-items: center;
+		font-size: 10px;
+		flex-shrink: 0;
+		background: rgba(255,255,255,0.08);
+	}
+	.step-lbl { overflow: hidden; text-overflow: ellipsis; }
+	.step:disabled { cursor: default; }
+	.step:not(:disabled):hover { filter: brightness(1.15); }
+	/* clip-path taie conturul de focus; îl desenăm înăuntru. */
+	.step:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--text); }
 	.step-active {
 		background: var(--accent);
 		color: white;
-		box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 	}
+	.step-active b { background: rgba(255,255,255,0.22); }
 	.step-done {
-		background: #22c55e;
-		color: #0b0b1a;
+		background: #10b98126;
+		color: #6ee7b7;
 	}
+	.step-done b { background: #10b98155; }
 	.step-pending {
 		background: var(--surface2);
 		color: var(--muted);
-		border: 1px solid var(--border);
+	}
+	/* Pe ecrane înguste cele patru etichete nu încap: rămâne doar a pasului activ,
+	   restul își arată numărul/bifa. Pasul activ ia spațiul liber. */
+	@media (max-width: 639px) {
+		.steps { height: 28px; }
+		.step { flex: 0 0 auto; padding: 0 8px 0 20px; gap: 5px; }
+		.step:first-child { padding-left: 10px; }
+		.step-active { flex: 1; }
+		.step:not(.step-active) .step-lbl { display: none; }
 	}
 
 	/* Butonul din antetul grilei de trepte — mic, ca să stea pe aceeași linie cu
@@ -1203,13 +1311,44 @@
 	   card în accentul categoriei lui (același tier() ca în listă). */
 	.alte-scroll {
 		display: flex;
-		gap: 10px;
+		gap: 10px; /* dacă se schimbă, schimbă și GAP din bandaNav() */
 		overflow-x: auto;
 		padding-bottom: 4px;
 		scroll-snap-type: x mandatory;
 		scrollbar-width: thin;
 		scrollbar-color: var(--border) transparent;
 	}
+	.alte-nav {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-shrink: 0;
+	}
+	.alte-count {
+		font-size: 10px;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		color: var(--muted);
+		font-variant-numeric: tabular-nums;
+		min-width: 58px;
+		text-align: right;
+	}
+	.alte-arrow {
+		width: 26px; height: 26px;
+		border-radius: 50%;
+		display: inline-grid; place-items: center;
+		padding: 0 0 2px;
+		font-size: 15px;
+		line-height: 1;
+		cursor: pointer;
+		color: var(--text);
+		background: color-mix(in srgb, #fff 8%, transparent);
+		border: 1px solid color-mix(in srgb, #fff 16%, transparent);
+		transition: background 0.15s ease, opacity 0.15s ease;
+	}
+	.alte-arrow:hover:not(:disabled) { background: color-mix(in srgb, #fff 16%, transparent); }
+	.alte-arrow:disabled { opacity: 0.3; cursor: default; }
+	.alte-arrow:focus-visible { outline: 2px solid var(--ac, var(--accent)); outline-offset: 2px; }
 	.alta-card {
 		flex: 0 0 150px;
 		scroll-snap-align: start;
@@ -1261,32 +1400,48 @@
 	.alta-ocupata { opacity: 0.6; }
 	.alta-ocupata .alta-foto img { filter: grayscale(0.6); }
 
-	.sticky-action {
+	/* Pastila plutitoare de jos. Stă deasupra navigației (înălțimea ei reală vine
+	   din layout ca --nav-h) și NU coboară la 0 pe lat: nav-ul rămâne vizibil și
+	   acolo. Pe mobil lasă liberi 84px la dreapta — coloana bulei de chat (52px,
+	   right 16px), care acoperea bara veche; pe ecrane late e centrată. */
+	.fab-cta {
 		position: fixed;
-		left: 0; right: 0;
-		/* Înălțimea reală a navigației, măsurată în layout — nu o valoare ghicită.
-		   Cu 64px fix, butonul intra sub meniu pe ecranele unde nav-ul e mai înalt. */
-		bottom: var(--nav-h, 64px);
 		z-index: 40;
-		padding: 8px 16px 12px;
-		background: linear-gradient(180deg, transparent 0%, rgba(13,13,34,0.85) 30%, rgba(13,13,34,0.98) 100%);
-		backdrop-filter: blur(10px);
-		-webkit-backdrop-filter: blur(10px);
-	}
-	.sticky-inner {
+		bottom: calc(var(--nav-h, 64px) + 12px);
+		left: 12px;
+		right: 84px;
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-		padding: 10px 14px;
-		border-radius: 16px;
+		gap: 10px;
+		padding: 6px 6px 6px 14px;
+		border-radius: 999px;
 		background: var(--surface);
-		border: 1px solid var(--border);
-		box-shadow: 0 -4px 24px -8px rgba(0,0,0,0.5);
+		border: 1px solid color-mix(in srgb, var(--ac, var(--accent)) 40%, var(--border));
+		box-shadow: 0 12px 36px -10px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.03) inset;
 	}
-
-	/* Pe lat NU coborâm bara la 0: navigația de jos rămâne vizibilă și acolo,
-	   iar regula asta o băga fix sub meniu — de-acolo veneau butoanele tăiate. */
+	@media (min-width: 640px) {
+		.fab-cta {
+			left: 50%;
+			right: auto;
+			transform: translateX(-50%);
+			min-width: 360px;
+			max-width: calc(100vw - 200px);
+		}
+	}
+	.fab-cta .min-w-0 { flex: 1; }
+	.fab-go { border-radius: 999px; padding: 10px 16px; flex-shrink: 0; }
+	.fab-back {
+		width: 34px; height: 34px;
+		flex-shrink: 0;
+		border-radius: 50%;
+		display: inline-grid; place-items: center;
+		background: var(--surface2);
+		border: 1px solid var(--border);
+		color: var(--text);
+		font-weight: 700;
+		cursor: pointer;
+	}
+	.fab-back:hover { border-color: color-mix(in srgb, var(--ac, var(--accent)) 60%, var(--border)); }
 
 	/* HERO grid: pe wide screens, foto + tarif card alături */
 	.hero-grid {
