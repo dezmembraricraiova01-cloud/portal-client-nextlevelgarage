@@ -624,7 +624,7 @@
 
 <!-- ═════ Modal cerere ștergere cont ═════ -->
 {#if stergereOpen}
-	<button class="fixed inset-0 z-[100]" style="background: rgba(0,0,0,0.7);"
+	<button class="fundal-modal fixed inset-0 z-[100]"
 		onclick={() => stergereOpen = false} aria-label="Închide"></button>
 
 	<div class="fixed bottom-0 left-0 right-0 z-[101] rounded-t-3xl"
@@ -683,7 +683,7 @@
 
 <!-- ═════ Modal cerere rectificare ═════ -->
 {#if rectificareOpen}
-	<button class="fixed inset-0 z-[100]" style="background: rgba(0,0,0,0.7);"
+	<button class="fundal-modal fixed inset-0 z-[100]"
 		onclick={() => rectificareOpen = false} aria-label="Închide"></button>
 
 	<div class="fixed bottom-0 left-0 right-0 z-[101] rounded-t-3xl"

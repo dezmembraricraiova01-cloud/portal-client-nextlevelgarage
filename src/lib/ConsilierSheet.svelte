@@ -171,7 +171,7 @@
 
 <!-- Sheet realocare -->
 {#if realocareOpen}
-	<button class="fixed inset-0 z-[60]" style="background: rgba(0,0,0,0.6);"
+	<button class="fundal-modal fixed inset-0 z-[60]"
 		onclick={() => { realocareOpen = false; trimitereOk = false; trimitereEroare = ''; }}
 		aria-label="Închide"></button>
 

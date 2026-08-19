@@ -377,7 +377,7 @@
      FORM OFERTĂ
      ════════════════════════════════════════════════════════ -->
 {#if offerOpen && tripData}
-	<button class="fixed inset-0 z-40" style="background: rgba(0,0,0,0.6);"
+	<button class="fundal-modal fixed inset-0 z-40"
 		onclick={() => offerOpen = false} aria-label="Închide"></button>
 
 	<div use:sheetAction

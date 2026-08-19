@@ -26,6 +26,34 @@ body {
 
 * { box-sizing: border-box; }
 
+/* ── Vălul din spatele oricărei ferestre / foi ──────────────────────────────
+   Un singur loc de adevăr pentru „cum arată pagina când se deschide ceva peste
+   ea": blur subtil, spălat deschis — pagina rămâne lizibilă, fereastra iese în
+   față. Reglat de om pe mockup cu cursoare (19.08.2026): blur 2px · văl deschis
+   35%. Orice suprapunere (buton de închis pe fundal sau div) pune clasa
+   `fundal-modal` și își păstrează doar z-index-ul; NU își mai scrie background
+   sau backdrop-filter. Schimbi aici → se schimbă peste tot. */
+:root {
+	--fundal-modal: rgba(226, 229, 240, 0.35);
+	--fundal-modal-filtru: blur(2px) saturate(1.05);
+}
+.fundal-modal {
+	position: fixed;
+	inset: 0;
+	border: 0;
+	padding: 0;
+	margin: 0;
+	cursor: default;
+	background: var(--fundal-modal);
+	backdrop-filter: var(--fundal-modal-filtru);
+	-webkit-backdrop-filter: var(--fundal-modal-filtru);
+	animation: fundal-modal-apare 0.18s ease-out;
+}
+@keyframes fundal-modal-apare { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+	.fundal-modal { animation: none; }
+}
+
 /* ── Shepherd.js dark theme ───────────────────────────────────── */
 .shepherd-element {
 	background: var(--surface) !important;

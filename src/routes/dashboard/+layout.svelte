@@ -562,7 +562,7 @@
 
 	<!-- Modal realocare consilier -->
 	{#if realocareOpen}
-		<button class="fixed inset-0 z-[65]" style="background: rgba(0,0,0,0.6);"
+		<button class="fundal-modal fixed inset-0 z-[65]"
 			onclick={() => { realocareOpen = false; realocareEroare = ''; }}
 			aria-label="Închide"></button>
 
