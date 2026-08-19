@@ -194,11 +194,14 @@
 		}
 	}
 
-	/** Duce la un pas și îl aduce în dreptul ochilor — altfel pare că nu s-a întâmplat nimic. */
+	/**
+	 * Duce la un pas și îl aduce în dreptul ochilor — altfel pare că nu s-a întâmplat nimic.
+	 * Pasul cu datele n-are panou: ochii se duc pe bara perioadei, de unde se deschide calendarul.
+	 */
 	async function mergiLaPas(nou: 1 | 2 | 3) {
 		step = nou;
 		await tick();
-		document.getElementById('pas')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		document.getElementById(nou === 1 ? 'perioada' : 'pas')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 	}
 
 	/**
@@ -313,9 +316,10 @@
 			<span style="color: var(--muted)" class="hidden sm:inline">Vehicul</span>
 			<span class="flex-1 h-px min-w-[12px]" style="background: var(--border)"></span>
 
-			<button type="button" onclick={() => (step = 1)} aria-current={step === 1 ? 'step' : undefined}
+			<!-- „Date" deschide calendarul: pasul n-are panou propriu, perioada se alege din bară. -->
+			<button type="button" onclick={schimbaDatele} aria-current={step === 1 ? 'step' : undefined}
 				class="step-dot {step === 1 ? 'step-active' : 'step-done'}" aria-label="Schimbă datele">{step > 1 ? '✓' : '2'}</button>
-			<button type="button" onclick={() => (step = 1)} style="color: {step === 1 ? 'var(--text)' : 'var(--muted)'}"
+			<button type="button" onclick={schimbaDatele} style="color: {step === 1 ? 'var(--text)' : 'var(--muted)'}"
 				class="uppercase tracking-wider">Date</button>
 			<span class="flex-1 h-px min-w-[12px]" style="background: var(--border)"></span>
 
@@ -628,7 +632,7 @@
 				prin pași. Acum intervalul se citește de la prima privire și are
 				butonul lui de schimbat lângă el.
 			-->
-			<div class="interval-bar" style="--ac: {theme.accent};"
+			<div id="perioada" class="interval-bar" style="--ac: {theme.accent}; scroll-margin-top: 12px;"
 				class:interval-gol={!canGoStep3}>
 				<span class="interval-icon" aria-hidden="true">
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -663,6 +667,19 @@
 				<p class="text-xs px-1" style="color: #ef4444">
 					Mașina e deja rezervată în perioada asta — schimbă datele.
 				</p>
+			{/if}
+
+			<!-- Zilele ocupate sunt stinse în calendar; lista stă aici, strânsă, pentru
+			     cine vrea să le citească fără să deschidă calendarul. -->
+			{#if blocate.length > 0}
+				<details class="text-xs px-1" style="color: var(--muted)">
+					<summary class="cursor-pointer font-medium">Vezi intervale ocupate ({blocate.length})</summary>
+					<ul class="mt-1.5 space-y-1 pl-3">
+						{#each blocate as b}
+							<li>· {fmtDate(b.from)} → {fmtDate(b.to)}</li>
+						{/each}
+					</ul>
+				</details>
 			{/if}
 
 			<!-- Spec icon grid (full width sub hero) -->
@@ -737,46 +754,14 @@
 				</div>
 			{/if}
 
-			<!-- Step content — `id` ca butoanele de sus să poată aduce pasul în dreptul ochilor -->
+			<!-- Step content — `id` ca butoanele de sus să poată aduce pasul în dreptul ochilor.
+			     Pasul cu datele NU mai are card: repeta bara perioadei de sub mașină
+			     (același calendar, același „alege zilele") și stătea sub caracteristici,
+			     unde părea alt formular. Perioada se alege din bară, din „Date" în
+			     stepper sau din CTA-uri — toate deschid direct calendarul. -->
+			{#if step > 1}
 			<div id="pas" class="p-4 rounded-2xl border space-y-3" style="background: var(--surface); border-color: var(--border); scroll-margin-top: 12px;">
-				{#if step === 1}
-					<h2 class="font-bold text-base" style="color: var(--text)">Alege intervalul</h2>
-					<p class="text-xs" style="color: var(--muted)">Plata la ridicare. Te sunăm pentru confirmare.</p>
-
-					<!-- Un singur calendar pentru ambele capete, ca pe listă. Două
-					     `<input type="date">` deschideau alt selector în fiecare browser,
-					     niciunul nu știa de celălalt capăt și niciunul nu putea stinge
-					     zilele deja rezervate — pe care ecranul ăsta le are la îndemână. -->
-					<button type="button" onclick={deschideCalendarul}
-						class="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left active:scale-[0.99] transition-transform"
-						style="background: var(--surface2); border: 1.5px solid {canGoStep3 ? theme.accent : 'var(--border)'}; color: var(--text);">
-						<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color: var(--muted); flex: none;"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>
-						{#if nrZile > 0}
-							<span class="text-sm font-semibold truncate">{fmtDate(dataStart)} → {fmtDate(dataEnd)}</span>
-						{:else}
-							<span class="text-sm" style="color: var(--muted)">Alege zilele</span>
-						{/if}
-						<span class="ml-auto text-xs shrink-0" style="color: var(--muted)">▾</span>
-					</button>
-
-					{#if intervalConflict}
-						<div class="p-2.5 rounded-lg text-xs"
-							style="background: #ef444418; color: #ef4444; border: 1px solid #ef444440;">
-							Mașina este deja rezervată în acest interval. Alege alte date.
-						</div>
-					{/if}
-
-					{#if blocate.length > 0}
-						<details class="text-xs" style="color: var(--muted)">
-							<summary class="cursor-pointer font-medium">Vezi intervale ocupate ({blocate.length})</summary>
-							<ul class="mt-2 space-y-1 pl-3">
-								{#each blocate as b}
-									<li>· {fmtDate(b.from)} → {fmtDate(b.to)}</li>
-								{/each}
-							</ul>
-						</details>
-					{/if}
-				{:else if step === 2}
+				{#if step === 2}
 					<div>
 						<h2 class="font-bold text-base" style="color: var(--text)">Adaugă servicii suplimentare</h2>
 						<p class="text-xs mt-0.5" style="color: var(--muted)">
@@ -905,6 +890,7 @@
 					{/if}
 				{/if}
 			</div>
+			{/if}
 		{/if}
 
 		<!-- Sticky bottom action bar -->
@@ -929,11 +915,18 @@
 
 					<div class="flex items-center gap-2">
 						{#if step === 1}
-							<button onclick={() => step = 2} disabled={!canGoStep2}
-								class="cta-btn"
-								class:cta-disabled={!canGoStep2}>
-								Continuă <span class="cta-arrow">→</span>
-							</button>
+							<!-- Fără card la pasul 1, butonul stins ar fi un drum înfundat pe
+							     mobil (CTA-ul din card e doar pe ecrane late): fără date deschide
+							     calendarul, cu date duce mai departe. -->
+							{#if canGoStep2}
+								<button onclick={() => step = 2} class="cta-btn">
+									Continuă <span class="cta-arrow">→</span>
+								</button>
+							{:else}
+								<button onclick={schimbaDatele} class="cta-btn">
+									Alege perioada <span class="cta-arrow">→</span>
+								</button>
+							{/if}
 						{:else if step === 2}
 							<button onclick={() => step = 1}
 								class="text-xs font-semibold px-3 py-2.5 rounded-xl"
@@ -1038,8 +1031,9 @@
 	}
 	.interval-btn:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
 
-	/* Butonul din antetul grilei de trepte — mic, în accentul cardului, ca să stea
-	   pe aceeași linie cu eticheta de 10px fără s-o împingă pe două rânduri. */
+	/* Butonul din antetul grilei de trepte — mic, ca să stea pe aceeași linie cu
+	   eticheta de 10px fără s-o împingă pe două rânduri. Deschis la culoare (text
+	   aproape alb pe alb translucid): în accentul mov al cardului se pierdea în fundal. */
 	.trepte-btn {
 		flex-shrink: 0;
 		font-size: 10px;
@@ -1049,15 +1043,15 @@
 		line-height: 1;
 		padding: 5px 8px;
 		border-radius: 8px;
-		color: var(--ac);
-		background: color-mix(in srgb, var(--ac) 12%, transparent);
-		border: 1px solid color-mix(in srgb, var(--ac) 35%, transparent);
+		color: var(--text);
+		background: color-mix(in srgb, #fff 14%, transparent);
+		border: 1px solid color-mix(in srgb, #fff 26%, transparent);
 		cursor: pointer;
 		transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
 	}
 	.trepte-btn:hover {
-		background: color-mix(in srgb, var(--ac) 22%, transparent);
-		border-color: color-mix(in srgb, var(--ac) 60%, transparent);
+		background: color-mix(in srgb, #fff 22%, transparent);
+		border-color: color-mix(in srgb, var(--ac) 70%, #fff);
 		transform: translateY(-1px);
 	}
 	.trepte-btn:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
