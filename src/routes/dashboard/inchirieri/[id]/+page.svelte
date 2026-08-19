@@ -541,12 +541,20 @@
 				</div>
 
 				<!-- Grila de trepte: argumentul „stai mai mult, plătești mai puțin", vizibil.
-				     Rândul duratei alese e evidențiat; treptele fără preț rămân la vedere. -->
+				     Rândul duratei alese e evidențiat; treptele fără preț rămân la vedere.
+				     În colțul din dreapta al antetului stă butonul de schimbat perioada:
+				     omul citește treptele, vede că la 4–7 zile e mai ieftin și vrea să-și
+				     mute datele chiar de aici, nu să caute bara perioadei mai jos. -->
 				{#if masina.tarife_trepte?.some(t => t.tarif)}
 					<div class="relative mt-4 rounded-xl overflow-hidden" style="border: 1px solid var(--border); background: var(--surface);">
-						<p class="text-[10px] font-bold uppercase tracking-wider px-3 pt-2.5 pb-1.5" style="color: var(--muted)">
-							Cu cât stai mai mult, cu atât e mai ieftin
-						</p>
+						<div class="flex items-center justify-between gap-2 px-3 pt-2 pb-1.5">
+							<p class="min-w-0 text-[10px] font-bold uppercase tracking-wider" style="color: var(--muted)">
+								Cu cât stai mai mult, cu atât e mai ieftin
+							</p>
+							<button type="button" onclick={schimbaDatele} class="trepte-btn">
+								{nrZile > 0 ? 'Schimbă perioada' : 'Alege perioada'}
+							</button>
+						</div>
 						{#each masina.tarife_trepte as t (t.treapta)}
 							{@const activ = treaptaCurenta?.treapta === t.treapta}
 							<div class="flex items-center justify-between gap-3 px-3 py-2 text-[12px]"
@@ -1029,6 +1037,30 @@
 		transform: translateY(-1px);
 	}
 	.interval-btn:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
+
+	/* Butonul din antetul grilei de trepte — mic, în accentul cardului, ca să stea
+	   pe aceeași linie cu eticheta de 10px fără s-o împingă pe două rânduri. */
+	.trepte-btn {
+		flex-shrink: 0;
+		font-size: 10px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		line-height: 1;
+		padding: 5px 8px;
+		border-radius: 8px;
+		color: var(--ac);
+		background: color-mix(in srgb, var(--ac) 12%, transparent);
+		border: 1px solid color-mix(in srgb, var(--ac) 35%, transparent);
+		cursor: pointer;
+		transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+	}
+	.trepte-btn:hover {
+		background: color-mix(in srgb, var(--ac) 22%, transparent);
+		border-color: color-mix(in srgb, var(--ac) 60%, transparent);
+		transform: translateY(-1px);
+	}
+	.trepte-btn:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
 
 	.spec-card {
 		display: flex;
