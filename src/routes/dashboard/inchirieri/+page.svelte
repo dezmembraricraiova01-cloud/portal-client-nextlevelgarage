@@ -218,7 +218,24 @@
 		return '⛽';
 	}
 
-	onMount(loadFlota);
+	/**
+	 * Perioada vine și din URL: fișa mașinii trimite înapoi `?from&to` („Înapoi
+	 * la flotă", „Toată flota"), iar până acum lista le ignora și omul alegea
+	 * datele a doua oară. Un interval întors pe dos sau cu o dată lipsă e ignorat.
+	 */
+	onMount(() => {
+		const p = new URLSearchParams(window.location.search);
+		const from = p.get('from') ?? '';
+		const to   = p.get('to') ?? '';
+		if (from && to && new Date(to).getTime() > new Date(from).getTime()) {
+			// Efectul de refetch de mai sus vede intervalul valid și încarcă el
+			// flota cu prețurile pe perioadă — un al doilea apel aici ar fi dublură.
+			dataStart = from;
+			dataEnd   = to;
+			return;
+		}
+		loadFlota();
+	});
 </script>
 
 <div class="space-y-4 pb-4">
