@@ -251,16 +251,18 @@
 			</a>
 		</div>
 
-		<!-- Step indicator: Date → Vehicul → Confirmă -->
-		<div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider">
-			<span class="step-dot {intervalValid ? 'step-done' : 'step-active'}">{intervalValid ? '✓' : '1'}</span>
-			<span style="color: var(--text)">Date</span>
-			<span class="flex-1 h-px" style="background: var(--border)"></span>
-			<span class="step-dot {intervalValid ? 'step-active' : 'step-pending'}">2</span>
-			<span style="color: {intervalValid ? 'var(--text)' : 'var(--muted)'}">Vehicul</span>
-			<span class="flex-1 h-px" style="background: var(--border)"></span>
-			<span class="step-dot step-pending">3</span>
-			<span style="color: var(--muted)">Confirmă</span>
+		<!-- Step indicator: Date → Vehicul → Confirmă — săgeți una-n alta, ca în fișă.
+		     Făcut = verde stins, activ = accent plin, de venit = gri. -->
+		<div class="steps" aria-label="Pașii rezervării">
+			<span class="step {intervalValid ? 'step-done' : 'step-active'}">
+				<b>{intervalValid ? '✓' : '1'}</b><span class="step-lbl">Date</span>
+			</span>
+			<span class="step {intervalValid ? 'step-active' : 'step-pending'}">
+				<b>2</b><span class="step-lbl">Vehicul</span>
+			</span>
+			<span class="step step-pending">
+				<b>3</b><span class="step-lbl">Confirmă</span>
+			</span>
 		</div>
 
 		<div>
@@ -351,10 +353,19 @@
 
 		{#if !intervalValid}
 			<p class="text-[11px] mt-2 leading-snug" style="color: var(--muted)">
-				💡 Alege zilele ca să filtrezi mașinile libere și să vezi prețul total.
+				💡 Alege zilele ca să vezi mașinile libere și prețul exact pe perioada ta.
 			</p>
 		{/if}
 	</div>
+
+	<!-- Fără perioadă nu se ajunge la mașini: „Vezi flota" de pe Acasă aterizează
+	     pe pasul cu datele și atât. Lista, clasele, cursorul de preț și căutarea
+	     apar abia cu intervalul ales, cu prețul pe zilele lui. Sub card rămâne un
+	     singur rând despre ce urmează — zilele se aleg o singură dată, în card. -->
+	{#if !intervalValid}
+		<p class="text-xs text-center px-4 py-3" style="color: var(--muted)">
+			Mașinile apar după ce alegi zilele{#if !loading && masini.length > 0} · {masini.length} în flotă{#if clase.length > 1} · {clase.length} clase{/if}{#if preturi.min > 0} · de la {preturi.min} lei/zi, calculat pe perioada ta{/if}{/if}
+		</p>
 
 	<CalendarInterval bind:deschis={calendarDeschis} bind:de={dataStart} bind:pana={dataEnd} />
 
@@ -375,6 +386,8 @@
 		{locuri}
 		titlu="Unde o aduci înapoi?"
 	/>
+
+	{:else}
 
 	<!-- Clasele vin numărate din flotă, nu dintr-o listă scrisă de mână: o pastilă
 	     care nu returnează nimic e mai rea decât lipsa ei. -->
@@ -646,25 +659,65 @@
 			{/each}
 		</div>
 	{/if}
+	{/if}<!-- /intervalValid: lista, filtrele și cursorul doar cu perioada -->
 </div>
 
 <style>
-	.step-dot {
-		width: 22px; height: 22px;
-		display: inline-flex; align-items: center; justify-content: center;
-		border-radius: 50%;
-		font-size: 11px;
+	/* Stepper cu săgeți una-n alta — același desen ca în fișa mașinii. Aici pașii
+	   nu sunt apăsabili (pagina E pasul 1 și 2), deci sunt span-uri. */
+	.steps {
+		display: flex;
+		align-items: stretch;
+		height: 30px;
+	}
+	.step {
+		position: relative;
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		padding: 0 12px 0 24px;
+		margin-left: -10px;
+		font-size: 10px;
 		font-weight: 700;
-	}
-	.step-active {
-		background: var(--accent);
-		color: white;
-		box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
-	}
-	.step-pending {
-		background: var(--surface2);
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		white-space: nowrap;
 		color: var(--muted);
-		border: 1px solid var(--border);
+		background: var(--surface2);
+		clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%, 13px 50%);
+	}
+	.step:first-child {
+		margin-left: 0;
+		padding-left: 14px;
+		border-radius: 8px 0 0 8px;
+		clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%);
+	}
+	.step:last-child {
+		border-radius: 0 8px 8px 0;
+		clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 13px 50%);
+	}
+	.step b {
+		width: 18px; height: 18px;
+		border-radius: 50%;
+		display: inline-grid; place-items: center;
+		font-size: 10px;
+		flex-shrink: 0;
+		background: rgba(255,255,255,0.08);
+	}
+	.step-lbl { overflow: hidden; text-overflow: ellipsis; }
+	.step-active { background: var(--accent); color: white; }
+	.step-active b { background: rgba(255,255,255,0.22); }
+	.step-done { background: #10b98126; color: #6ee7b7; }
+	.step-done b { background: #10b98155; }
+	.step-pending { background: var(--surface2); color: var(--muted); }
+	@media (max-width: 639px) {
+		.steps { height: 28px; }
+		.step { flex: 0 0 auto; padding: 0 8px 0 20px; gap: 5px; }
+		.step:first-child { padding-left: 10px; }
+		.step-active { flex: 1; }
+		.step:not(.step-active) .step-lbl { display: none; }
 	}
 
 	.car-card {
@@ -781,11 +834,6 @@
 	.car-card-disabled .select-cta,
 	.car-card-disabled:hover .select-arrow {
 		transform: none;
-	}
-
-	.step-done {
-		background: #22c55e;
-		color: #0b0b1a;
 	}
 
 	@media (prefers-reduced-motion: reduce) {
