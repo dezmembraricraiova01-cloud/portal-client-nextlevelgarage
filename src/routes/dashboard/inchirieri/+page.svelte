@@ -4,7 +4,7 @@
 	import Skeleton from '$lib/Skeleton.svelte';
 	import CalendarInterval from '$lib/components/CalendarInterval.svelte';
 	import LocPicker from '$lib/components/LocPicker.svelte';
-	import { citesteVazute, rangVazuta } from '$lib/vazute';
+	import { citesteVazute, ultimaVazuta } from '$lib/vazute';
 
 	let masini       = $state<MasinaInchiriereCard[]>([]);
 	let locuri       = $state<LocInchiriere[]>([]);
@@ -17,8 +17,9 @@
 	let q            = $state('');
 	let combust      = $state('');
 	let clasaAleasa  = $state('');
-	/** Mașinile deschise în sesiunea asta (cele mai recente primele) — stau primele în listă, cu „Văzută". */
+	/** Mașinile deschise în sesiunea asta, cele mai recente primele; doar ultima stă prima în listă, cu „Ultima văzută". */
 	let vazute       = $state<number[]>([]);
+	let ultimaVazutaId = $derived(ultimaVazuta(vazute));
 
 	// Date selection (înainte de a alege mașina)
 	let dataStart    = $state('');
@@ -124,11 +125,11 @@
 				if (pretMaxim > 0 && pretVizibil && pretVizibil > pretMaxim) return false;
 				return true;
 			})
-			// Mașinile deja deschise în sesiunea asta primele (ultima văzută chiar
-			// prima — omul compară și se întoarce), apoi disponibilele când avem interval.
+			// Ultima mașină deschisă în sesiunea asta prima (una singură, cu pastilă —
+			// omul compară și se întoarce), apoi disponibilele când avem interval.
 			.sort((a, b) => {
-				const va = rangVazuta(vazute, a.id);
-				const vb = rangVazuta(vazute, b.id);
+				const va = a.id === ultimaVazutaId ? 0 : 1;
+				const vb = b.id === ultimaVazutaId ? 0 : 1;
 				if (va !== vb) return va - vb;
 				if (!intervalValid) return 0;
 				const da = a.disponibila_interval === false ? 1 : 0;
@@ -550,10 +551,10 @@
 
 							<span class="flex items-center gap-1 shrink-0">
 								<!-- Deja deschisă în sesiunea asta: stă prima în listă și o spune. -->
-								{#if vazute.includes(m.id)}
+								{#if m.id === ultimaVazutaId}
 									<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase"
 										style="background: rgba(13,13,34,0.72); color: #fff; border: 1px solid rgba(255,255,255,0.28); backdrop-filter: blur(6px); letter-spacing: 0.06em;">
-										{vazute[0] === m.id ? 'Ultima văzută' : 'Văzută'}
+										Ultima văzută
 									</span>
 								{/if}
 								{#if m.rezervari_azi > 0}

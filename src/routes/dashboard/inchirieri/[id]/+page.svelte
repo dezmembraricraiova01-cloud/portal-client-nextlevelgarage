@@ -4,7 +4,7 @@
 	import { api, type MasinaInchiriereDetaliu, type MasinaInchiriereCard, type IntervalBlocat, type InchiriereForm, type ExtraOferit, type LocInchiriere, type InchiriereCerere } from '$lib/api';
 	import Skeleton from '$lib/Skeleton.svelte';
 	import CalendarInterval from '$lib/components/CalendarInterval.svelte';
-	import { noteazaVazuta, rangVazuta } from '$lib/vazute';
+	import { noteazaVazuta, ultimaVazuta } from '$lib/vazute';
 
 	let masina    = $state<MasinaInchiriereDetaliu | null>(null);
 	let blocate   = $state<IntervalBlocat[]>([]);
@@ -388,17 +388,19 @@
 	}
 
 	/**
-	 * Ordinea benzii: mașinile deja deschise în sesiunea asta primele (ultima
-	 * văzută chiar prima — omul compară și se întoarce), apoi aceeași clasă
-	 * (alternativa directă), apoi cele libere în perioadă, apoi cele ieftine.
-	 * Derivat, nu calculat la răspuns: fișa și flota se încarcă în paralel, iar
-	 * clasa mașinii curente poate sosi a doua.
+	 * Ordinea benzii: ULTIMA mașină văzută prima (omul compară și se întoarce;
+	 * una singură, cu pastilă — mai multe „Văzută" se citeau ca o listă de bifat),
+	 * apoi aceeași clasă (alternativa directă), apoi cele libere în perioadă, apoi
+	 * cele ieftine. Derivat, nu calculat la răspuns: fișa și flota se încarcă în
+	 * paralel, iar clasa mașinii curente poate sosi a doua.
 	 */
+	let ultimaVazutaId = $derived(ultimaVazuta(vazute, masinaId));
 	let alteMasini = $derived.by(() => {
 		const clasaMea = masina?.clasa ?? null;
+		const ultima   = ultimaVazutaId;
 		return [...alteMasiniBrute].sort((a, b) => {
-			const va = rangVazuta(vazute, a.id);
-			const vb = rangVazuta(vazute, b.id);
+			const va = a.id === ultima ? 0 : 1;
+			const vb = b.id === ultima ? 0 : 1;
 			if (va !== vb) return va - vb;
 			const ca = a.clasa === clasaMea ? 0 : 1;
 			const cb = b.clasa === clasaMea ? 0 : 1;
@@ -559,10 +561,9 @@
 										{m.clasa_eticheta}
 									</span>
 								{/if}
-								<!-- Deja deschisă în sesiunea asta: stă prima și o spune. vazute[0] e
-								     mașina curentă, deci vazute[1] e ultima văzută înaintea ei. -->
-								{#if vazute.includes(m.id)}
-									<span class="alta-chip alta-vazuta">{vazute[1] === m.id ? 'Ultima văzută' : 'Văzută'}</span>
+								<!-- Ultima mașină deschisă înaintea acesteia: stă prima și o spune. Doar una. -->
+								{#if m.id === ultimaVazutaId}
+									<span class="alta-chip alta-vazuta">Ultima văzută</span>
 								{/if}
 							</div>
 							<div class="alta-text">

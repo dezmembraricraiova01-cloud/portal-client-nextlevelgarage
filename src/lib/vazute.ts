@@ -1,8 +1,10 @@
 /**
  * Mașinile de închiriat deja deschise de om, în sesiunea asta — cele mai
  * recente primele. Servesc la un singur lucru: când se uită la a doua, a
- * treia mașină, cele văzute stau primele în bandă și în listă, cu o pastilă
- * „Văzută", ca să nu le caute iar („aia albă de mai devreme era…?").
+ * treia mașină, ULTIMA văzută stă prima în bandă și în listă, cu pastila
+ * „Ultima văzută", ca să n-o caute iar („aia albă de mai devreme era…?").
+ * Doar una: mai multe pastile „Văzută" se citeau ca o listă de bifat, nu ca
+ * un semn de întoarcere.
  *
  * sessionStorage, nu localStorage: e memoria unei căutări, nu un istoric —
  * la o vizită nouă omul pornește curat. Fără server: nu e nimic de sincronizat.
@@ -31,8 +33,11 @@ export function noteazaVazuta(id: number): number[] {
 	return v;
 }
 
-/** Poziția în istoric, pentru sortare: 0 = cea mai recentă; Infinity = nevăzută. */
-export function rangVazuta(vazute: number[], id: number): number {
-	const i = vazute.indexOf(id);
-	return i < 0 ? Infinity : i;
+/**
+ * Ultima mașină văzută, alta decât `curenta` (în fișă, [0] e chiar mașina de pe
+ * ecran — n-are sens s-o arătăm ca „ultima văzută" în propria ei bandă). null
+ * când n-a fost deschisă încă nicio altă mașină.
+ */
+export function ultimaVazuta(vazute: number[], curenta: number | null = null): number | null {
+	return vazute.find((id) => id !== curenta) ?? null;
 }
