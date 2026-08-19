@@ -40,8 +40,6 @@
 	let calendarDeschis = $state(false);
 	/** Calendarul s-a deschis din butonul de rezervare, deci drumul continuă spre sumar. */
 	let intervalCerutDinCta = $state(false);
-	/** Calendarul s-a deschis singur la intrare (fișă fără perioadă în URL); după alegere se continuă la Extras. */
-	let intervalCerutLaIntrare = $state(false);
 
 	// Cererea așa cum a înregistrat-o serverul. Recapitularea de la final se face
 	// din ea, nu din calculele de aici: omul trebuie să vadă ce s-a scris în
@@ -132,11 +130,41 @@
 	let canSubmit  = $derived(canGoStep2 && !saving);
 
 	/**
-	 * Bara fixă de jos apare abia când există o perioadă: până atunci repeta al
-	 * treilea „Alege perioada" de pe același ecran (hero, grila de trepte, footer). La Extras
-	 * și Confirmă rămâne mereu — duce totalul estimat și săgețile între pași.
+	 * Pastila plutitoare apare abia când există o perioadă: până atunci repeta al
+	 * treilea „Alege perioada" de pe același ecran (hero, grila de trepte, footer).
+	 * Și doar pe fișă (pasul 1): la Extras și Confirmă, fereastra are subsolul ei
+	 * cu același conținut — două rânduri de butoane pentru aceeași acțiune ar fi
+	 * fost unul în plus.
 	 */
-	let baraJosVizibila = $derived(!formSuccess && (step > 1 || canGoStep2));
+	let baraJosVizibila = $derived(!formSuccess && step === 1 && canGoStep2);
+
+	/** Fereastra cu Extras/Confirmă e deschisă cât timp pasul e 2 sau 3 — nu are stare proprie. */
+	let fereastraDeschisa = $derived(!formSuccess && step > 1);
+
+	/** Închide fereastra fără să piardă nimic: datele și extrasele rămân, pastila o redeschide. */
+	function inchideFereastra() {
+		step = 1;
+	}
+
+	/**
+	 * Cât e fereastra deschisă, pagina din spate nu derulează (altfel roata
+	 * mouse-ului peste fundal mișcă fișa, nu lista din fereastră) și Escape o
+	 * închide. Calendarul, deschis peste fereastră, își ia el Escape-ul — aici
+	 * nu facem nimic cât e el deschis.
+	 */
+	$effect(() => {
+		if (!fereastraDeschisa) return;
+		const prev = document.body.style.overflow;
+		document.body.style.overflow = 'hidden';
+		const onKey = (ev: KeyboardEvent) => {
+			if (ev.key === 'Escape' && !calendarDeschis) inchideFereastra();
+		};
+		window.addEventListener('keydown', onKey);
+		return () => {
+			document.body.style.overflow = prev;
+			window.removeEventListener('keydown', onKey);
+		};
+	});
 
 	async function load() {
 		loading = true;
@@ -195,18 +223,16 @@
 			const fromParam = params.get('from');
 			const toParam   = params.get('to');
 			if (fromParam && toParam) {
+				// Omul rămâne pe fișă (pasul 1): vede întâi mașina, iar pastila
+				// „Continuă" deschide fereastra cu Extras când vrea el. Înainte săream
+				// direct la Extras; cu fereastra, saltul ar fi acoperit mașina. Un
+				// interval întors pe dos îl prind nrZile/canGoStep2 (pastila nu apare).
 				dataStart = fromParam;
 				dataEnd   = toParam;
-				// validăm rapid: trebuie ca interval să fie > 0
-				const s = new Date(dataStart).getTime();
-				const e = new Date(dataEnd).getTime();
-				if (e > s && !intervalConflict) step = 2; // sare direct la Extras
 			} else {
 				// Fără perioadă nu se ajunge la mașini: lista cere datele înainte să
 				// arate flota, iar un link direct (vechi, bookmark, trimis de cineva)
-				// primește calendarul la intrare. După alegere drumul continuă la
-				// Extras, ca pentru cine vine din listă cu datele în URL.
-				intervalCerutLaIntrare = true;
+				// primește calendarul la intrare. După alegere rămâne pe fișă, cu pastila.
 				calendarDeschis = true;
 			}
 		} catch (e: any) {
@@ -219,13 +245,19 @@
 	}
 
 	/**
-	 * Duce la un pas și îl aduce în dreptul ochilor — altfel pare că nu s-a întâmplat nimic.
-	 * Pasul cu datele n-are panou: ochii se duc pe cardul de tarif, de unde se deschide calendarul.
+	 * Duce la un pas. Pasul 1 e fișa: ochii se duc pe cardul de tarif, de unde se
+	 * deschide calendarul. Pașii 2 și 3 sunt fereastra, care apare peste orice —
+	 * nu e nimic de derulat; îi ducem doar focusul înăuntru, ca tastatura și
+	 * cititorul de ecran să fie unde e și privirea.
 	 */
 	async function mergiLaPas(nou: 1 | 2 | 3) {
 		step = nou;
 		await tick();
-		document.getElementById(nou === 1 ? 'tarif' : 'pas')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		if (nou === 1) {
+			document.getElementById('tarif')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		} else {
+			document.getElementById('fereastra-titlu')?.focus();
+		}
 	}
 
 	/**
@@ -250,13 +282,10 @@
 	 */
 	$effect(() => {
 		if (calendarDeschis || step !== 1 || !canGoStep3) return;
-		if (intervalCerutDinCta) {
-			intervalCerutDinCta = false;
-			mergiLaPas(3);
-		} else if (intervalCerutLaIntrare) {
-			intervalCerutLaIntrare = false;
-			mergiLaPas(2);
-		}
+		if (!intervalCerutDinCta) return;
+
+		intervalCerutDinCta = false;
+		mergiLaPas(3);
 	});
 
 	/**
@@ -353,7 +382,6 @@
 			cerereTrimisa = null;
 			calendarDeschis = false;
 			intervalCerutDinCta = false;
-			intervalCerutLaIntrare = false;
 			dataStart = '';
 			dataEnd = '';
 			load();
@@ -597,11 +625,11 @@
 				class="step {step === 1 ? 'step-active' : 'step-done'}" aria-label="Schimbă datele">
 				<b>{step > 1 ? '✓' : '2'}</b><span class="step-lbl">Date</span>
 			</button>
-			<button type="button" onclick={() => canGoStep2 && (step = 2)} disabled={!canGoStep2} aria-current={step === 2 ? 'step' : undefined}
+			<button type="button" onclick={() => canGoStep2 && mergiLaPas(2)} disabled={!canGoStep2} aria-current={step === 2 ? 'step' : undefined}
 				class="step {step === 2 ? 'step-active' : (step > 2 ? 'step-done' : 'step-pending')}" aria-label="Servicii suplimentare">
 				<b>{step > 2 ? '✓' : '3'}</b><span class="step-lbl">Extras</span>
 			</button>
-			<button type="button" onclick={() => canGoStep3 && (step = 3)} disabled={!canGoStep3} aria-current={step === 3 ? 'step' : undefined}
+			<button type="button" onclick={() => canGoStep3 && mergiLaPas(3)} disabled={!canGoStep3} aria-current={step === 3 ? 'step' : undefined}
 				class="step {step === 3 ? 'step-active' : 'step-pending'}" aria-label="Confirmă rezervarea">
 				<b>4</b><span class="step-lbl">Confirmă</span>
 			</button>
@@ -1002,19 +1030,39 @@
 				</div>
 			{/if}
 
-			<!-- Step content — `id` ca butoanele de sus să poată aduce pasul în dreptul ochilor.
-			     Pasul cu datele NU are card: perioada se alege din cardul de tarif
-			     („Alege/Schimbă perioada"), din „Date" în stepper sau din CTA-uri — toate
-			     deschid direct calendarul, iar datele alese se citesc în eticheta prețului. -->
-			{#if step > 1}
-			<div id="pas" class="p-4 rounded-2xl border space-y-3" style="background: var(--surface); border-color: var(--border); scroll-margin-top: 12px;">
-				{#if step === 2}
-					<div>
-						<h2 class="font-bold text-base" style="color: var(--text)">Adaugă servicii suplimentare</h2>
-						<p class="text-xs mt-0.5" style="color: var(--muted)">
-							Opțional · costul se adaugă la totalul rezervării
+			<!--
+				Pașii Extras și Confirmă — o FEREASTRĂ peste fișă, nu un panou la capătul
+				paginii (pe care omul îl găsea derulând, sub poză, sub bandă). Pasul cu
+				datele NU are panou: perioada se alege din cardul de tarif, din „Date" în
+				stepper sau din CTA-uri — toate deschid direct calendarul.
+				Fereastra: antet (pasul, titlul, „✕"), corp derulabil, subsol cu totalul
+				și butoanele — adică ce era pastila plutitoare, mutată înăuntru. „✕" și
+				fundalul închid fără să piardă nimic; pastila „Continuă" o redeschide.
+			-->
+			{#if fereastraDeschisa}
+			<button type="button" class="fereastra-fundal" onclick={inchideFereastra} aria-label="Închide fereastra"></button>
+			<div class="fereastra" role="dialog" aria-modal="true" aria-labelledby="fereastra-titlu" style="--ac: {theme.accent};">
+				<div class="fereastra-cap">
+					<div class="min-w-0">
+						<p class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--muted)">
+							Pasul {step === 2 ? 3 : 4} din 4 · {step === 2 ? 'Extras' : 'Confirmă'}
+						</p>
+						<h2 id="fereastra-titlu" tabindex="-1" class="font-extrabold text-[17px] leading-tight mt-0.5 outline-none" style="color: var(--text)">
+							{step === 2 ? 'Adaugă servicii suplimentare' : 'Confirmă rezervarea'}
+						</h2>
+						<p class="text-xs mt-0.5 truncate" style="color: var(--muted)">
+							{#if step === 2}
+								Opțional · costul se adaugă la totalul rezervării
+							{:else}
+								{masina.marca} {masina.model} · {perioadaScurta} · {nrZile} {nrZile === 1 ? 'zi' : 'zile'}
+							{/if}
 						</p>
 					</div>
+					<button type="button" onclick={inchideFereastra} class="fereastra-x" aria-label="Închide">✕</button>
+				</div>
+
+				<div class="fereastra-corp space-y-3">
+				{#if step === 2}
 
 					<div class="space-y-2">
 						{#each extras as e (e.cod)}
@@ -1056,7 +1104,6 @@
 						</div>
 					{/if}
 				{:else}
-					<h2 class="font-bold text-base" style="color: var(--text)">Confirmă rezervarea</h2>
 
 					<!-- Summary -->
 					<div class="p-3 rounded-xl space-y-1.5 text-sm"
@@ -1069,9 +1116,9 @@
 							<span style="color: var(--muted)">Perioadă</span>
 							<span class="flex items-center gap-2">
 								<span class="font-semibold" style="color: var(--text)">{fmtDate(dataStart)} → {fmtDate(dataEnd)}</span>
-								<!-- Răzgândirea trebuie să fie la îndemână chiar aici, nu doar
-								     prin doi pași înapoi din săgeată. -->
-								<button type="button" onclick={() => (step = 1)}
+								<!-- Răzgândirea chiar aici: calendarul se deschide PESTE fereastră, omul rămâne
+								     pe Confirmă cu datele noi — nu-l trimitem doi pași înapoi. -->
+								<button type="button" onclick={deschideCalendarul}
 									class="shrink-0 text-[11px] font-semibold underline"
 									style="color: var(--accent);">schimbă</button>
 							</span>
@@ -1136,52 +1183,56 @@
 						</div>
 					{/if}
 				{/if}
-			</div>
-			{/if}
-		{/if}
+				</div><!-- /fereastra-corp -->
 
-		<!-- Butonul plutitor — doar cu perioada aleasă (vezi baraJosVizibila).
-		     Era o bară pe toată lățimea, peste care cădea bula de chat din colțul
-		     dreapta-jos și acoperea „Continuă". Acum e o pastilă: centrată pe ecrane
-		     late, lipită de stânga pe mobil, cu coloana bulei lăsată liberă. -->
-		{#if baraJosVizibila}
-			<div class="fab-cta" style="--ac: {theme.accent};">
-				{#if step > 1}
-					<button type="button" onclick={() => step = step === 3 ? 2 : 1} class="fab-back" aria-label="Pasul anterior">←</button>
-				{/if}
-
-				<div class="min-w-0 leading-tight">
-					{#if nrZile > 0}
+				<!-- Subsolul ferestrei: totalul estimat + „←" (doar la Confirmă — la Extras
+				     n-ar duce decât afară, adică exact ce face „✕") + acțiunea pasului. -->
+				<div class="fereastra-subsol">
+					{#if step === 3}
+						<button type="button" onclick={() => mergiLaPas(2)} class="fab-back" aria-label="Înapoi la Extras">←</button>
+					{/if}
+					<div class="min-w-0 flex-1 leading-tight">
 						<p class="text-[10px] font-bold uppercase tracking-wider truncate" style="color: var(--muted)">
 							{nrZile} {nrZile === 1 ? 'zi' : 'zile'} estimate
 						</p>
 						<p class="text-[15px] font-extrabold tabular-nums" style="color: var(--text)">
 							{costEstimat.toFixed(2)} <span class="text-[10px] font-medium" style="color: var(--muted)">lei</span>
 						</p>
+					</div>
+					{#if step === 2}
+						<button onclick={() => mergiLaPas(3)} disabled={!canGoStep3} class="cta-btn fab-go">
+							{extraseAlese.length === 0 ? 'Sari peste' : 'Continuă'} <span class="cta-arrow">→</span>
+						</button>
 					{:else}
-						<p class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--muted)">
-							{tarifAfisat ? `de la ${tarifAfisat.toFixed(0)} lei/zi` : 'tarif la cerere'}
-						</p>
-						<p class="text-sm font-semibold" style="color: var(--text)">Alege intervalul</p>
+						<button onclick={rezerva} disabled={!canSubmit}
+							class="cta-btn fab-go"
+							class:cta-disabled={!canSubmit}>
+							{saving ? 'Se trimite...' : 'Trimite cererea'} <span class="cta-arrow">→</span>
+						</button>
 					{/if}
 				</div>
+			</div><!-- /fereastra -->
+			{/if}
+		{/if}
 
-				{#if step === 1}
-					<!-- Pastila există la pasul 1 doar cu perioada aleasă, deci butonul duce mereu mai departe. -->
-					<button onclick={() => step = 2} class="cta-btn fab-go">
-						Continuă <span class="cta-arrow">→</span>
-					</button>
-				{:else if step === 2}
-					<button onclick={() => step = 3} disabled={!canGoStep3} class="cta-btn fab-go">
-						{extraseAlese.length === 0 ? 'Sari peste' : 'Continuă'} <span class="cta-arrow">→</span>
-					</button>
-				{:else}
-					<button onclick={rezerva} disabled={!canSubmit}
-						class="cta-btn fab-go"
-						class:cta-disabled={!canSubmit}>
-						{saving ? 'Se trimite...' : 'Trimite cererea'} <span class="cta-arrow">→</span>
-					</button>
-				{/if}
+		<!-- Pastila plutitoare — doar pe fișă, cu perioada aleasă (vezi baraJosVizibila).
+		     Era o bară pe toată lățimea, peste care cădea bula de chat din colțul
+		     dreapta-jos și acoperea „Continuă". Acum e o pastilă: centrată pe ecrane
+		     late, lipită de stânga pe mobil, cu coloana bulei lăsată liberă. Deschide
+		     fereastra cu Extras; acolo, subsolul ferestrei preia rolul ei. -->
+		{#if baraJosVizibila}
+			<div class="fab-cta" style="--ac: {theme.accent};">
+				<div class="min-w-0 leading-tight">
+					<p class="text-[10px] font-bold uppercase tracking-wider truncate" style="color: var(--muted)">
+						{nrZile} {nrZile === 1 ? 'zi' : 'zile'} estimate
+					</p>
+					<p class="text-[15px] font-extrabold tabular-nums" style="color: var(--text)">
+						{costEstimat.toFixed(2)} <span class="text-[10px] font-medium" style="color: var(--muted)">lei</span>
+					</p>
+				</div>
+				<button onclick={() => mergiLaPas(2)} class="cta-btn fab-go">
+					Continuă <span class="cta-arrow">→</span>
+				</button>
 			</div>
 		{/if}
 	{/if}
@@ -1464,6 +1515,70 @@
 		cursor: pointer;
 	}
 	.fab-back:hover { border-color: color-mix(in srgb, var(--ac, var(--accent)) 60%, var(--border)); }
+
+	/* Fereastra cu Extras / Confirmă. Peste nav (z 50) și bula de chat (z 50), sub
+	   calendar (z 100), care se poate deschide PESTE ea din „schimbă". Centrată pe
+	   orice ecran, ca și calendarul; pe mobil ia aproape tot ecranul, cu corpul
+	   derulabil între antet și subsol — subsolul cu butoanele rămâne mereu la vedere. */
+	.fereastra-fundal {
+		position: fixed;
+		inset: 0;
+		z-index: 90;
+		border: 0;
+		cursor: default;
+		background: rgba(13,13,34,0.6);
+		backdrop-filter: blur(3px);
+		-webkit-backdrop-filter: blur(3px);
+	}
+	.fereastra {
+		position: fixed;
+		z-index: 91;
+		left: 50%; top: 50%;
+		transform: translate(-50%, -50%);
+		width: min(560px, calc(100vw - 24px));
+		max-height: min(calc(100dvh - 24px), 860px);
+		display: flex;
+		flex-direction: column;
+		border-radius: 20px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		box-shadow: 0 30px 80px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.04) inset;
+	}
+	.fereastra-cap {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 16px 18px 12px;
+		border-bottom: 1px solid var(--border);
+	}
+	.fereastra-x {
+		width: 32px; height: 32px;
+		flex-shrink: 0;
+		border-radius: 50%;
+		border: 1px solid var(--border);
+		background: var(--surface2);
+		color: var(--text);
+		font-size: 13px;
+		cursor: pointer;
+	}
+	.fereastra-x:hover { border-color: color-mix(in srgb, var(--ac, var(--accent)) 60%, var(--border)); }
+	.fereastra-corp {
+		padding: 14px 18px;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		flex: 1 1 auto;
+		min-height: 0;
+	}
+	.fereastra-subsol {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 10px 12px 12px;
+		border-top: 1px solid var(--border);
+		background: color-mix(in srgb, var(--surface) 80%, #000);
+		border-radius: 0 0 20px 20px;
+	}
 
 	/* HERO grid: pe wide screens, foto + tarif card alături */
 	.hero-grid {
