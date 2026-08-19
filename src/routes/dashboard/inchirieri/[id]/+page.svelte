@@ -1526,10 +1526,15 @@
 		z-index: 90;
 		border: 0;
 		cursor: default;
-		background: rgba(13,13,34,0.6);
-		backdrop-filter: blur(3px);
-		-webkit-backdrop-filter: blur(3px);
+		/* Blur puternic pe toată pagina din spate, văl mai subțire: fereastra
+		   rămâne crocantă, restul se topește — ca la calendar și LocPicker. */
+		background: rgba(8, 10, 18, 0.42);
+		backdrop-filter: blur(14px) saturate(1.1);
+		-webkit-backdrop-filter: blur(14px) saturate(1.1);
+		animation: fundalApare 0.18s ease-out;
 	}
+	@keyframes fundalApare { from { opacity: 0; } to { opacity: 1; } }
+	@media (prefers-reduced-motion: reduce) { .fereastra-fundal { animation: none; } }
 	.fereastra {
 		position: fixed;
 		z-index: 91;
