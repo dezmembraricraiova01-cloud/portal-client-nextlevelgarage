@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { page } from '$app/state';
-	import { api, type MasinaInchiriereDetaliu, type IntervalBlocat, type InchiriereForm, type ExtraOferit, type LocInchiriere, type InchiriereCerere } from '$lib/api';
+	import { api, type MasinaInchiriereDetaliu, type MasinaInchiriereCard, type IntervalBlocat, type InchiriereForm, type ExtraOferit, type LocInchiriere, type InchiriereCerere } from '$lib/api';
 	import Skeleton from '$lib/Skeleton.svelte';
 	import CalendarInterval from '$lib/components/CalendarInterval.svelte';
 
@@ -44,6 +44,11 @@
 	// din ea, nu din calculele de aici: omul trebuie să vadă ce s-a scris în
 	// registru, nu ce socotise ecranul cu o secundă înainte.
 	let cerereTrimisa = $state<InchiriereCerere | null>(null);
+
+	// Restul flotei, pentru banda „Alte mașini": răspunsul la „e ceva mai ieftin /
+	// mai mare?" vine în fișă, nu după o întoarcere la listă care pierdea perioada.
+	let alteMasiniBrute    = $state<MasinaInchiriereCard[]>([]);
+	let alteMasiniPerioada = $state(false); // prețurile din bandă sunt pe perioada aleasă, nu „de la"
 
 	let masinaId = $derived(Number(page.params.id));
 
@@ -123,7 +128,7 @@
 
 	/**
 	 * Bara fixă de jos apare abia când există o perioadă: până atunci repeta al
-	 * treilea „Alege perioada" de pe același ecran (hero, bară, footer). La Extras
+	 * treilea „Alege perioada" de pe același ecran (hero, grila de trepte, footer). La Extras
 	 * și Confirmă rămâne mereu — duce totalul estimat și săgețile între pași.
 	 */
 	let baraJosVizibila = $derived(!formSuccess && (step > 1 || canGoStep2));
@@ -203,12 +208,12 @@
 
 	/**
 	 * Duce la un pas și îl aduce în dreptul ochilor — altfel pare că nu s-a întâmplat nimic.
-	 * Pasul cu datele n-are panou: ochii se duc pe bara perioadei, de unde se deschide calendarul.
+	 * Pasul cu datele n-are panou: ochii se duc pe cardul de tarif, de unde se deschide calendarul.
 	 */
 	async function mergiLaPas(nou: 1 | 2 | 3) {
 		step = nou;
 		await tick();
-		document.getElementById(nou === 1 ? 'perioada' : 'pas')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		document.getElementById(nou === 1 ? 'tarif' : 'pas')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 	}
 
 	/**
@@ -286,6 +291,22 @@
 
 	const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short', year: 'numeric' });
 
+	/**
+	 * Perioada, scurt, pentru eticheta prețului: „20–23 aug" în aceeași lună,
+	 * „28 aug – 2 sep" peste două. Bara perioadei a plecat, deci aici e singurul
+	 * loc din card unde omul își vede datele înainte de pasul Confirmă.
+	 */
+	let perioadaScurta = $derived.by(() => {
+		if (nrZile < 1) return '';
+		const s = new Date(dataStart);
+		const e = new Date(dataEnd);
+		const luna = (d: Date) => d.toLocaleDateString('ro-RO', { month: 'short' }).replace('.', '');
+		if (s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear()) {
+			return `${s.getDate()}–${e.getDate()} ${luna(e)}`;
+		}
+		return `${s.getDate()} ${luna(s)} – ${e.getDate()} ${luna(e)}`;
+	});
+
 	// Theming inteligent pe categorie — același cu listing-ul
 	function tier(categoria: string) {
 		const c = (categoria ?? '').toUpperCase();
@@ -299,12 +320,121 @@
 
 	let theme = $derived(masina ? tier(masina.categoria) : tier(''));
 
-	onMount(load);
+	/**
+	 * Încărcarea urmează id-ul, nu montarea. Din banda „Alte mașini" se trece la
+	 * altă fișă pe ACEEAȘI rută, deci componenta nu se remontează: cu onMount,
+	 * ecranul ar fi rămas pe mașina veche sub id-ul nou. Starea legată de mașina
+	 * veche se aduce la zero; datele și locurile le recitește load() din URL.
+	 * Telefonul, observațiile și extrasele bifate rămân — sunt ale omului, nu ale mașinii.
+	 */
+	$effect(() => {
+		masinaId; // dependența: alt id, altă încărcare
+		untrack(() => {
+			pozaIdx = 0;
+			step = 1;
+			formSuccess = false;
+			formError = '';
+			cerereTrimisa = null;
+			calendarDeschis = false;
+			intervalCerutDinCta = false;
+			dataStart = '';
+			dataEnd = '';
+			load();
+		});
+	});
+
+	/**
+	 * Banda „Alte mașini" se încarcă o dată per mașină și ori de câte ori se
+	 * schimbă perioada: prețul pe zi din bandă e cel al perioadei alese, ca să se
+	 * compare cu cel din card, nu un „de la" care ar minți la 3 zile.
+	 */
+	let alteMasiniCerere = 0;
+	$effect(() => {
+		const id = masinaId;
+		const from = nrZile > 0 ? dataStart : '';
+		const to   = nrZile > 0 ? dataEnd : '';
+		untrack(() => incarcaAlteMasini(id, from, to));
+	});
+
+	async function incarcaAlteMasini(id: number, from: string, to: string) {
+		const cerere = ++alteMasiniCerere;
+		try {
+			const res = await api.inchirieriFlota(from && to ? { from, to } : undefined);
+			if (cerere !== alteMasiniCerere) return; // a venit una mai nouă între timp
+
+			alteMasiniBrute    = res.masini.filter((m) => m.id !== id);
+			alteMasiniPerioada = !!(from && to);
+		} catch {
+			// Banda e un ajutor, nu o condiție: fără ea fișa merge la fel.
+			if (cerere === alteMasiniCerere) alteMasiniBrute = [];
+		}
+	}
+
+	/**
+	 * Ordinea benzii: aceeași clasă prima (alternativa directă), apoi cele libere
+	 * în perioadă, apoi cele ieftine. Derivat, nu calculat la răspuns: fișa și
+	 * flota se încarcă în paralel, iar clasa mașinii curente poate sosi a doua.
+	 */
+	let alteMasini = $derived.by(() => {
+		const clasaMea = masina?.clasa ?? null;
+		return [...alteMasiniBrute].sort((a, b) => {
+			const ca = a.clasa === clasaMea ? 0 : 1;
+			const cb = b.clasa === clasaMea ? 0 : 1;
+			if (ca !== cb) return ca - cb;
+			const da = a.disponibila_interval === false ? 1 : 0;
+			const db = b.disponibila_interval === false ? 1 : 0;
+			if (da !== db) return da - db;
+			return (a.tarif_zi ?? a.tarif_de_la ?? 1e9) - (b.tarif_zi ?? b.tarif_de_la ?? 1e9);
+		});
+	});
+
+	/**
+	 * Parametrii care poartă contextul mai departe — perioada și locurile — ca
+	 * fișa următoare (sau lista) să nu întrebe din nou ce s-a răspuns deja.
+	 * Aceeași convenție ca în listă (carUrl): capătul de returnare se scrie
+	 * doar când diferă de preluare.
+	 */
+	function paramsContext(): URLSearchParams {
+		const p = new URLSearchParams();
+		if (nrZile > 0) {
+			p.set('from', dataStart);
+			p.set('to', dataEnd);
+		}
+		if (locDeTip !== 'sediu' || locDeAdresa) {
+			p.set('loc_de', locDeTip);
+			if (locDeAdresa) p.set('adr_de', locDeAdresa);
+			if (locDeUat) p.set('uat_de', String(locDeUat));
+		}
+		const panaDiferit = locPanaTip !== locDeTip || locPanaAdresa !== locDeAdresa || locPanaUat !== locDeUat;
+		if (panaDiferit) {
+			p.set('loc_pana', locPanaTip);
+			if (locPanaAdresa) p.set('adr_pana', locPanaAdresa);
+			if (locPanaUat) p.set('uat_pana', String(locPanaUat));
+		}
+		return p;
+	}
+
+	function urlAltaMasina(id: number): string {
+		const q = paramsContext().toString();
+		return `/dashboard/inchirieri/${id}${q ? `?${q}` : ''}`;
+	}
+
+	/** Înapoi la listă CU perioada: până acum întoarcerea o pierdea și omul alegea datele iar. */
+	let urlFlota = $derived.by(() => {
+		const p = new URLSearchParams();
+		if (nrZile > 0) {
+			p.set('from', dataStart);
+			p.set('to', dataEnd);
+		}
+		const q = p.toString();
+		return `/dashboard/inchirieri${q ? `?${q}` : ''}`;
+	});
 </script>
 
 <!-- Spatiu cat navigatia PLUS bara de actiune (cand e afisata), ca ultimul rand sa nu ramana dedesubt. -->
 <div class="space-y-4" style="padding-bottom: calc(var(--nav-h, 64px) + {baraJosVizibila ? '96px' : '16px'});">
-	<a href="/dashboard/inchirieri" class="inline-flex items-center gap-1.5 text-xs font-semibold"
+	<!-- Întoarcerea poartă perioada: lista o citește din URL și n-o mai cere o dată. -->
+	<a href={urlFlota} class="inline-flex items-center gap-1.5 text-xs font-semibold"
 		style="color: var(--muted); text-decoration: none;">← Înapoi la flotă</a>
 
 	{#if loading}
@@ -315,15 +445,70 @@
 			{loadError}
 		</div>
 	{:else if masina}
+		<!--
+			Banda „Alte mașini" — același markup randat în două locuri (sub poză pe
+			desktop, sub caracteristici pe mobil); CSS-ul alege care se vede.
+			Prețul din bandă e pe perioada aleasă, ca să se compare cu cel din card.
+			Cardurile poartă perioada și locurile mai departe (urlAltaMasina).
+		-->
+		{#snippet bandaAlteMasini()}
+			<div class="alte-masini">
+				<div class="flex items-center justify-between gap-2 mb-2">
+					<p class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--muted)">
+						Alte mașini {alteMasiniPerioada ? 'pentru perioada ta' : 'din flotă'}
+						<span class="font-semibold" style="opacity: 0.7;">· {alteMasini.length}</span>
+					</p>
+					<a href={urlFlota} class="text-[10px] font-bold uppercase tracking-wider shrink-0"
+						style="color: var(--muted); text-decoration: none;">Toată flota →</a>
+				</div>
+				<div class="alte-scroll">
+					{#each alteMasini as m (m.id)}
+						{@const t = tier(m.categoria)}
+						{@const ocupata = alteMasiniPerioada && m.disponibila_interval === false}
+						{@const pret = alteMasiniPerioada ? m.tarif_zi : m.tarif_de_la}
+						<a href={urlAltaMasina(m.id)} class="alta-card" class:alta-ocupata={ocupata} style="--ac: {t.accent};">
+							<div class="alta-foto" style="background: linear-gradient(135deg, {t.bg1} 0%, {t.bg2} 100%);">
+								{#if m.foto_url}
+									<img src={m.foto_url} alt="{m.marca} {m.model}" loading="lazy" />
+								{:else}
+									<svg class="alta-fara-poza" viewBox="0 0 24 24" fill="none" stroke={t.accent} stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+										<path d="M5 17h14M3 17l1.4-7.5a2 2 0 0 1 2-1.5h11.2a2 2 0 0 1 2 1.5L21 17"/>
+										<circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>
+									</svg>
+								{/if}
+								{#if m.clasa_eticheta}
+									<span class="alta-chip" style="color: {t.chip}; border-color: {t.chipBorder}; background: color-mix(in srgb, {t.accent} 18%, rgba(13,13,34,0.85));">
+										{m.clasa_eticheta}
+									</span>
+								{/if}
+							</div>
+							<div class="alta-text">
+								<p class="alta-nume">{m.marca} {m.model}</p>
+								<p class="alta-pret">
+									{#if ocupata}
+										ocupată în perioadă
+									{:else if pret}
+										{#if !alteMasiniPerioada}de la {/if}<b>{pret.toFixed(0)}</b> lei/zi
+									{:else}
+										la cerere
+									{/if}
+								</p>
+							</div>
+						</a>
+					{/each}
+				</div>
+			</div>
+		{/snippet}
+
 		<!-- Step indicator (4 pași: Vehicul ✓ · Date · Extras · Confirmă)
 		     Pașii sunt APĂSABILI: bifa ✓ promite că te poți întoarce, iar înainte
 		     se putea doar din săgeată, câte un pas. Datele rămân completate. -->
 		<div class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider overflow-x-auto">
-			<a href="/dashboard/inchirieri" class="step-dot step-done" style="text-decoration: none;" aria-label="Înapoi la flotă">✓</a>
-			<span style="color: var(--muted)" class="hidden sm:inline">Vehicul</span>
+			<a href={urlFlota} class="step-dot step-done" style="text-decoration: none;" aria-label="Înapoi la flotă">✓</a>
+			<a href={urlFlota} style="color: var(--muted); text-decoration: none;" class="hidden sm:inline uppercase tracking-wider">Vehicul</a>
 			<span class="flex-1 h-px min-w-[12px]" style="background: var(--border)"></span>
 
-			<!-- „Date" deschide calendarul: pasul n-are panou propriu, perioada se alege din bară. -->
+			<!-- „Date" deschide calendarul: pasul n-are panou propriu, perioada se alege din cardul de tarif. -->
 			<button type="button" onclick={schimbaDatele} aria-current={step === 1 ? 'step' : undefined}
 				class="step-dot {step === 1 ? 'step-active' : 'step-done'}" aria-label="Schimbă datele">{step > 1 ? '✓' : '2'}</button>
 			<button type="button" onclick={schimbaDatele} style="color: {step === 1 ? 'var(--text)' : 'var(--muted)'}"
@@ -439,7 +624,7 @@
 		{:else}
 			<!-- HERO grid: poză + tarif card alături pe wide screens -->
 			<div class="hero-grid">
-			<div class="hero-stage rounded-2xl overflow-hidden border relative"
+			<div class="hero-stage rounded-2xl overflow-hidden border relative flex flex-col"
 				style="--ac: {theme.accent}; border-color: color-mix(in srgb, {theme.accent} 35%, var(--border)); background: linear-gradient(135deg, {theme.bg1} 0%, {theme.bg2} 100%);">
 				<!-- Aurora glow în spate -->
 				<div class="hero-aurora absolute inset-0 pointer-events-none"
@@ -496,11 +681,22 @@
 						</p>
 					</div>
 				</div>
+
+				<!-- Pe ecrane late hero-ul se întinde la înălțimea cardului de tarif și
+				     sub poză rămânea un sfert de ecran gol. Acolo stă banda cu restul
+				     flotei: „vehiculul" e primul pas, iar alternativele lui sunt tot
+				     aici, nu după o întoarcere la listă. Pe mobil banda e sub caracteristici. -->
+				{#if alteMasini.length > 0}
+					<div class="hidden lg:block relative z-10 mt-auto px-4 pb-4 pt-3">
+						{@render bandaAlteMasini()}
+					</div>
+				{/if}
 			</div>
 
-			<!-- TARIF CARD — business-driven, lângă poză pe wide screens -->
-			<div class="tarif-card relative overflow-hidden p-4 rounded-2xl flex flex-col"
-				style="--ac: {theme.accent}; background: linear-gradient(135deg, color-mix(in srgb, {theme.accent} 22%, transparent) 0%, color-mix(in srgb, {theme.accent} 6%, transparent) 60%, transparent 100%), var(--surface); border: 1px solid color-mix(in srgb, {theme.accent} 38%, transparent);">
+			<!-- TARIF CARD — business-driven, lângă poză pe wide screens. `id` = ținta
+			     de scroll a pasului „Date": perioada se vede și se schimbă de aici. -->
+			<div id="tarif" class="tarif-card relative overflow-hidden p-4 rounded-2xl flex flex-col"
+				style="--ac: {theme.accent}; scroll-margin-top: 12px; background: linear-gradient(135deg, color-mix(in srgb, {theme.accent} 22%, transparent) 0%, color-mix(in srgb, {theme.accent} 6%, transparent) 60%, transparent 100%), var(--surface); border: 1px solid color-mix(in srgb, {theme.accent} 38%, transparent);">
 				<div class="tarif-shimmer absolute inset-0 pointer-events-none"></div>
 
 				<!-- Banner top: social proof / scarcity -->
@@ -526,7 +722,7 @@
 				<div class="relative flex items-start justify-between gap-3">
 					<div class="min-w-0">
 						<p class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--muted)">
-							{#if tarifCurent}Tarif/zi · {treaptaCurenta?.eticheta} · TVA inclus{:else if tarifAfisat}De la · TVA inclus{:else}Tarif{/if}
+							{#if tarifCurent}{perioadaScurta} · {nrZile} {nrZile === 1 ? 'zi' : 'zile'} · TVA inclus{:else if tarifAfisat}De la · TVA inclus{:else}Tarif{/if}
 						</p>
 						{#if tarifAfisat}
 							<p class="font-bold leading-none mt-1" style="color: #34d399; text-shadow: 0 0 24px color-mix(in srgb, #10b981 40%, transparent);">
@@ -555,7 +751,7 @@
 				     Rândul duratei alese e evidențiat; treptele fără preț rămân la vedere.
 				     În colțul din dreapta al antetului stă butonul de schimbat perioada:
 				     omul citește treptele, vede că la 4–7 zile e mai ieftin și vrea să-și
-				     mute datele chiar de aici, nu să caute bara perioadei mai jos. -->
+				     mute datele chiar de aici, lângă preț, nu să caute în altă parte. -->
 				{#if masina.tarife_trepte?.some(t => t.tarif)}
 					<div class="relative mt-4 rounded-xl overflow-hidden" style="border: 1px solid var(--border); background: var(--surface);">
 						<div class="flex items-center justify-between gap-2 px-3 pt-2 pb-1.5">
@@ -579,6 +775,24 @@
 							</div>
 						{/each}
 					</div>
+				{/if}
+
+				<!-- Conflictul și zilele ocupate stau lângă preț și lângă butonul de
+				     schimbat perioada — bara de sub mașină, care le purta, a plecat. -->
+				{#if intervalConflict}
+					<p class="relative text-xs mt-2 px-1" style="color: #ef4444">
+						Mașina e deja rezervată în perioada asta — schimbă datele.
+					</p>
+				{/if}
+				{#if blocate.length > 0}
+					<details class="relative text-xs mt-2 px-1" style="color: var(--muted)">
+						<summary class="cursor-pointer font-medium">Vezi intervale ocupate ({blocate.length})</summary>
+						<ul class="mt-1.5 space-y-1 pl-3">
+							{#each blocate as b}
+								<li>· {fmtDate(b.from)} → {fmtDate(b.to)}</li>
+							{/each}
+						</ul>
+					</details>
 				{/if}
 
 				<!-- Trust badges grid — color-coded pentru încredere -->
@@ -617,6 +831,60 @@
 					</div>
 				</div>
 
+				<!-- Caracteristicile — chip-uri mici între garanții și butonul mare, în golul
+				     care stătea liber pe ecrane late. Erau o grilă de carduri sub poză, la
+				     fel de mari ca grila de prețuri, pentru informație de un rând. -->
+				<div class="spec-chips relative">
+					{#if masina.nr_locuri}
+						<span class="spec-chip">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+							{masina.nr_locuri} <em>locuri</em>
+						</span>
+					{/if}
+					{#if masina.nr_usi}
+						<span class="spec-chip">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16"/><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18"/><circle cx="14" cy="13" r="1"/></svg>
+							{masina.nr_usi} <em>uși</em>
+						</span>
+					{/if}
+					{#if masina.transmisie}
+						<span class="spec-chip">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+							{masina.transmisie.toLowerCase().startsWith('aut') ? 'A' : (masina.transmisie.toLowerCase().startsWith('man') ? 'M' : masina.transmisie.charAt(0).toUpperCase())} <em>{masina.transmisie}</em>
+						</span>
+					{/if}
+					{#if masina.combustibil}
+						<span class="spec-chip">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="15" y2="22"/><line x1="4" y1="9" x2="14" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2v0a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/></svg>
+							{masina.combustibil}
+						</span>
+					{/if}
+					{#if masina.putere_cp}
+						<span class="spec-chip">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+							{masina.putere_cp} <em>CP</em>
+						</span>
+					{/if}
+					{#if masina.km_nelimitati || masina.km_inclusi_zi}
+						<span class="spec-chip">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+							{masina.km_nelimitati ? '∞' : masina.km_inclusi_zi} <em>{masina.km_nelimitati ? 'km' : 'km/zi'}</em>
+						</span>
+					{/if}
+					{#if masina.are_ac}
+						<span class="spec-chip">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07"/></svg>
+							AC
+						</span>
+					{/if}
+					{#if masina.is_4wd}
+						<span class="spec-chip">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+							4×4
+						</span>
+					{/if}
+				</div>
+
 				<!-- Spacer pentru wide screens -->
 				<div class="hidden lg:block flex-1"></div>
 
@@ -632,122 +900,9 @@
 			</div>
 			</div><!-- /hero-grid -->
 
-			<!--
-				Bara perioadei — primul lucru sub mașină, pe orice ecran.
-				Perioada aleasă în listă ajungea aici doar ca parametru în URL: se
-				vedea abia dacă derulai până la calendar, iar răzgândirea se căuta
-				prin pași. Acum intervalul se citește de la prima privire și are
-				butonul lui de schimbat lângă el.
-			-->
-			<div id="perioada" class="interval-bar" style="--ac: {theme.accent}; scroll-margin-top: 12px;"
-				class:interval-gol={!canGoStep3}>
-				<span class="interval-icon" aria-hidden="true">
-					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-				</span>
-
-				<div class="min-w-0 flex-1">
-					<p class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--muted)">
-						Perioada închirierii
-					</p>
-					{#if nrZile > 0}
-						<p class="text-sm font-bold leading-tight truncate" style="color: var(--text)">
-							{fmtDate(dataStart)} → {fmtDate(dataEnd)}
-							<span class="font-semibold" style="color: {theme.accent}">· {nrZile} {nrZile === 1 ? 'zi' : 'zile'}</span>
-						</p>
-					{:else}
-						<p class="text-sm font-semibold leading-tight" style="color: var(--text)">
-							Nu ai ales încă perioada
-						</p>
-					{/if}
-				</div>
-
-				<button type="button" onclick={schimbaDatele} class="interval-btn">
-					{nrZile > 0 ? 'Schimbă' : 'Alege'}
-				</button>
-			</div>
-
 			<!-- Calendarul cunoaște zilele deja rezervate pe mașina asta, deci le stinge
 			     în loc să lase omul să le aleagă și să afle abia la trimitere. -->
 			<CalendarInterval bind:deschis={calendarDeschis} bind:de={dataStart} bind:pana={dataEnd} {blocate} />
-
-			{#if intervalConflict}
-				<p class="text-xs px-1" style="color: #ef4444">
-					Mașina e deja rezervată în perioada asta — schimbă datele.
-				</p>
-			{/if}
-
-			<!-- Zilele ocupate sunt stinse în calendar; lista stă aici, strânsă, pentru
-			     cine vrea să le citească fără să deschidă calendarul. -->
-			{#if blocate.length > 0}
-				<details class="text-xs px-1" style="color: var(--muted)">
-					<summary class="cursor-pointer font-medium">Vezi intervale ocupate ({blocate.length})</summary>
-					<ul class="mt-1.5 space-y-1 pl-3">
-						{#each blocate as b}
-							<li>· {fmtDate(b.from)} → {fmtDate(b.to)}</li>
-						{/each}
-					</ul>
-				</details>
-			{/if}
-
-			<!-- Spec icon grid (full width sub hero) -->
-			<div class="grid grid-cols-4 sm:grid-cols-8 gap-2" style="--ac: {theme.accent};">
-				{#if masina.nr_locuri}
-					<div class="spec-card">
-						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-						<p class="spec-val">{masina.nr_locuri}</p>
-						<p class="spec-lbl">Locuri</p>
-					</div>
-				{/if}
-				{#if masina.nr_usi}
-					<div class="spec-card">
-						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16"/><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18"/><circle cx="14" cy="13" r="1"/></svg>
-						<p class="spec-val">{masina.nr_usi}</p>
-						<p class="spec-lbl">Uși</p>
-					</div>
-				{/if}
-				{#if masina.transmisie}
-					<div class="spec-card">
-						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-						<p class="spec-val">{masina.transmisie.toLowerCase().startsWith('aut') ? 'A' : (masina.transmisie.toLowerCase().startsWith('man') ? 'M' : masina.transmisie.charAt(0).toUpperCase())}</p>
-						<p class="spec-lbl">{masina.transmisie}</p>
-					</div>
-				{/if}
-				{#if masina.combustibil}
-					<div class="spec-card">
-						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="15" y2="22"/><line x1="4" y1="9" x2="14" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2v0a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/></svg>
-						<p class="spec-val text-xs leading-tight">{masina.combustibil}</p>
-						<p class="spec-lbl">Combustibil</p>
-					</div>
-				{/if}
-				{#if masina.are_ac}
-					<div class="spec-card">
-						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07"/></svg>
-						<p class="spec-val">AC</p>
-						<p class="spec-lbl">Climă</p>
-					</div>
-				{/if}
-				{#if masina.is_4wd}
-					<div class="spec-card">
-						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-						<p class="spec-val">4×4</p>
-						<p class="spec-lbl">Tracțiune</p>
-					</div>
-				{/if}
-				{#if masina.putere_cp}
-					<div class="spec-card">
-						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-						<p class="spec-val">{masina.putere_cp}</p>
-						<p class="spec-lbl">CP</p>
-					</div>
-				{/if}
-				{#if masina.km_nelimitati || masina.km_inclusi_zi}
-					<div class="spec-card">
-						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-						<p class="spec-val">{masina.km_nelimitati ? '∞' : masina.km_inclusi_zi}</p>
-						<p class="spec-lbl">{masina.km_nelimitati ? 'km' : 'km/zi'}</p>
-					</div>
-				{/if}
-			</div>
 
 			{#if masina.dotari.length > 0}
 				<div>
@@ -761,11 +916,16 @@
 				</div>
 			{/if}
 
+			{#if alteMasini.length > 0}
+				<div class="lg:hidden">
+					{@render bandaAlteMasini()}
+				</div>
+			{/if}
+
 			<!-- Step content — `id` ca butoanele de sus să poată aduce pasul în dreptul ochilor.
-			     Pasul cu datele NU mai are card: repeta bara perioadei de sub mașină
-			     (același calendar, același „alege zilele") și stătea sub caracteristici,
-			     unde părea alt formular. Perioada se alege din bară, din „Date" în
-			     stepper sau din CTA-uri — toate deschid direct calendarul. -->
+			     Pasul cu datele NU are card: perioada se alege din cardul de tarif
+			     („Alege/Schimbă perioada"), din „Date" în stepper sau din CTA-uri — toate
+			     deschid direct calendarul, iar datele alese se citesc în eticheta prețului. -->
 			{#if step > 1}
 			<div id="pas" class="p-4 rounded-2xl border space-y-3" style="background: var(--surface); border-color: var(--border); scroll-margin-top: 12px;">
 				{#if step === 2}
@@ -982,55 +1142,6 @@
 		border: 1px solid var(--border);
 	}
 
-	/* Bara perioadei — sub mașină, cu butonul de schimbat la capăt */
-	.interval-bar {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 10px 12px;
-		border-radius: 14px;
-		background: color-mix(in srgb, var(--ac) 8%, var(--surface));
-		border: 1px solid color-mix(in srgb, var(--ac) 32%, var(--border));
-	}
-	/* Fără interval ales, bara își arată golul: contur întrerupt, fără culoare. */
-	.interval-bar.interval-gol {
-		background: var(--surface);
-		border-style: dashed;
-		border-color: var(--border);
-	}
-	.interval-icon {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 32px; height: 32px;
-		border-radius: 10px;
-		flex-shrink: 0;
-		background: color-mix(in srgb, var(--ac) 16%, transparent);
-		color: var(--ac);
-	}
-	.interval-gol .interval-icon {
-		background: var(--surface2);
-		color: var(--muted);
-	}
-	.interval-btn {
-		flex-shrink: 0;
-		font-size: 12px;
-		font-weight: 700;
-		padding: 8px 14px;
-		border-radius: 10px;
-		background: var(--surface2);
-		color: var(--text);
-		border: 1px solid var(--border);
-		cursor: pointer;
-		transition: border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
-	}
-	.interval-btn:hover {
-		border-color: color-mix(in srgb, var(--ac) 60%, var(--border));
-		color: var(--ac);
-		transform: translateY(-1px);
-	}
-	.interval-btn:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
-
 	/* Butonul din antetul grilei de trepte — mic, ca să stea pe aceeași linie cu
 	   eticheta de 10px fără s-o împingă pe două rânduri. Deschis la culoare (text
 	   aproape alb pe alb translucid): în accentul mov al cardului se pierdea în fundal. */
@@ -1056,39 +1167,99 @@
 	}
 	.trepte-btn:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
 
-	.spec-card {
+	/* Caracteristicile — chip-uri mici, translucide, pe un rând care se rupe;
+	   iconița în accentul categoriei (--ac vine de pe card). */
+	.spec-chips {
 		display: flex;
-		flex-direction: column;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin-top: 14px;
+		font-size: 11px;
+	}
+	.spec-chip {
+		display: inline-flex;
 		align-items: center;
-		justify-content: center;
-		padding: 12px 6px;
+		gap: 5px;
+		padding: 5px 8px;
+		border-radius: 8px;
+		font-weight: 700;
+		line-height: 1;
+		letter-spacing: 0.01em;
+		color: var(--text);
+		background: color-mix(in srgb, #fff 7%, transparent);
+		border: 1px solid color-mix(in srgb, #fff 14%, transparent);
+	}
+	.spec-chip svg { width: 12px; height: 12px; color: var(--ac); flex-shrink: 0; }
+	.spec-chip em {
+		font-style: normal;
+		font-weight: 600;
+		font-size: 9px;
+		letter-spacing: 0.07em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+
+	/* Banda „Alte mașini" — carduri mici, derulare orizontală cu snap; fiecare
+	   card în accentul categoriei lui (același tier() ca în listă). */
+	.alte-scroll {
+		display: flex;
+		gap: 10px;
+		overflow-x: auto;
+		padding-bottom: 4px;
+		scroll-snap-type: x mandatory;
+		scrollbar-width: thin;
+		scrollbar-color: var(--border) transparent;
+	}
+	.alta-card {
+		flex: 0 0 150px;
+		scroll-snap-align: start;
 		border-radius: 12px;
+		overflow: hidden;
 		background: var(--surface);
 		border: 1px solid var(--border);
+		text-decoration: none;
 		color: var(--text);
-		text-align: center;
-		gap: 2px;
-		transition: border-color 0.25s ease, background 0.25s ease, transform 0.2s ease;
+		transition: border-color 0.2s ease, transform 0.15s ease;
 	}
-	.spec-card:hover {
-		transform: translateY(-1px);
-		background: color-mix(in srgb, var(--ac) 6%, var(--surface));
-		border-color: color-mix(in srgb, var(--ac) 35%, var(--border));
+	.alta-card:hover {
+		border-color: color-mix(in srgb, var(--ac) 60%, var(--border));
+		transform: translateY(-2px);
 	}
-	.spec-card svg { color: var(--ac, var(--accent)); margin-bottom: 4px; }
-	.spec-val {
-		font-size: 14px;
-		font-weight: 700;
-		color: var(--text);
-		line-height: 1.1;
+	.alta-card:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
+	.alta-foto {
+		position: relative;
+		aspect-ratio: 16 / 10;
 	}
-	.spec-lbl {
-		font-size: 10px;
-		color: var(--muted);
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		font-weight: 600;
+	.alta-foto img {
+		display: block;
+		width: 100%; height: 100%;
+		object-fit: cover;
 	}
+	.alta-fara-poza {
+		position: absolute; inset: 0;
+		width: 48px; height: 48px;
+		margin: auto;
+		opacity: 0.5;
+	}
+	.alta-chip {
+		position: absolute; top: 6px; left: 6px;
+		font-size: 9px; font-weight: 700;
+		text-transform: uppercase; letter-spacing: 0.06em;
+		padding: 2px 6px;
+		border-radius: 5px;
+		border: 1px solid;
+		backdrop-filter: blur(6px);
+	}
+	.alta-text { padding: 8px 10px 9px; }
+	.alta-nume {
+		font-size: 12px; font-weight: 700; line-height: 1.2;
+		white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+	}
+	.alta-pret { font-size: 11px; margin-top: 3px; color: var(--muted); }
+	.alta-pret b { color: var(--ac); font-size: 13px; }
+	/* Ocupată în perioadă: rămâne la vedere (omul își poate muta datele), dar stinsă. */
+	.alta-ocupata { opacity: 0.6; }
+	.alta-ocupata .alta-foto img { filter: grayscale(0.6); }
 
 	.sticky-action {
 		position: fixed;
