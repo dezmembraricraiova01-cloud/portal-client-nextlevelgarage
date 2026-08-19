@@ -178,6 +178,14 @@
 
 	let chatOpen    = $state(false);
 	let chatUnread  = $state(0);
+
+	// Orice pagină poate deschide chatul („Nu știi ce are? scrie-ne") fără să
+	// știe de starea layout-ului: aruncă evenimentul și bula se deschide.
+	onMount(() => {
+		const deschide = () => (chatOpen = true);
+		window.addEventListener('portal:deschide-chat', deschide);
+		return () => window.removeEventListener('portal:deschide-chat', deschide);
+	});
 	let chatChoice  = $state<'lucrare' | 'consilier' | null>(null);
 	let woUid       = $derived($activeWoUid);
 	let workOrders  = $derived($activeWorkOrders);
