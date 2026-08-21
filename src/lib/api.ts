@@ -221,6 +221,8 @@ export const api = {
 	reparatii:     ()           => priv<Paginated<WorkOrder>>('GET', '/reparatii'),
 	/** Galeria de laudă a atelierului (Setări → Portal clienți în WMS) — pagina Reparații. */
 	serviceGalerie: () => priv<{ galerie: { url: string; titlu: string }[] }>('GET', '/service/galerie'),
+	/** Atelierul de pe cardul „Programează-te" — vine din Setări → Date firmă (WMS), nu din cod. */
+	serviceAtelier: () => priv<{ atelier: Atelier | null }>('GET', '/service/atelier'),
 	reparatiiPage: (page: number) => priv<Paginated<WorkOrder>>('GET', `/reparatii?page=${page}`),
 	reparatie: (uid: string) =>
 		priv<{ wo: WorkOrder; timeline: TimelineStep[]; feedback: Feedback | null }>('GET', `/reparatii/${uid}`),
@@ -434,6 +436,17 @@ export interface ProgramareMini {
 	status:              string;
 	tip_serviciu:        string | null;
 	tip_serviciu_label:  string | null;
+}
+
+/**
+ * Atelierul afișat pe cardul „Programează-te la service", din Setări → Date
+ * firmă (WMS). `null` — pe firma NLG, sau pe adresa ei — înseamnă „nu avem ce
+ * scrie": rândul se ascunde, cardul rămâne întreg.
+ */
+export interface Atelier {
+	denumire: string;
+	adresa:   string | null;
+	telefon:  string | null;
 }
 
 export interface TipServiciu {

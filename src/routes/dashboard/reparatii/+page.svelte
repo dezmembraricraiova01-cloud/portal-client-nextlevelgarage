@@ -4,6 +4,7 @@
 	import { api, timeAgo, type WorkOrder, type MasinaActiva, type ProgramareMini, type TimelineStep } from '$lib/api';
 	import Skeleton from '$lib/Skeleton.svelte';
 	import ProgressStepper from '$lib/ProgressStepper.svelte';
+	import { atelier, atelierLinie, incarcaAtelier } from '$lib/atelier';
 
 	let reparatii   = $state<WorkOrder[]>([]);
 	let loading     = $state(true);
@@ -49,6 +50,7 @@
 				}
 			})
 			.catch(() => {});
+		incarcaAtelier();
 		api.serviceGalerie()
 			.then((res) => (galerie = res.galerie))
 			.catch(() => {});
@@ -121,15 +123,20 @@
 		</a>
 	{:else if !loading}
 		<!-- Client fără nimic activ: pagina îl duce la programare, nu-i arată un gol. -->
-		<a href="/dashboard/programari/noua" class="rep-cta">
-			<span class="rep-orb">🔧</span>
+		<a href="/dashboard/programari/noua" class="cta-service">
+			<span class="cta-service-orb">🔧</span>
 			<span class="flex-1 min-w-0">
 				<b class="block text-base" style="color: #fff">Programează-te la service</b>
-				<span class="block text-xs mt-0.5" style="color: rgba(255,255,255,0.85)">
-					diagnoză pe loc · piese din dezmembrări la preț mic · mașină de schimb cât durează
+				{#if $atelier}
+					<span class="block text-xs font-semibold mt-0.5 truncate" style="color: rgba(255,255,255,0.94)">
+						{atelierLinie($atelier)}
+					</span>
+				{/if}
+				<span class="block text-[11px] mt-px" style="color: rgba(255,255,255,0.7)">
+					diagnoză pe loc · mașină de schimb cât durează reparația
 				</span>
 			</span>
-			<span class="rep-go shrink-0">Alege ziua →</span>
+			<span class="cta-service-go">Alege ziua →</span>
 		</a>
 
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -291,32 +298,8 @@
 	}
 
 	/* Bannerul de programare — cald, alt caracter decât vitrina de închirieri. */
-	.rep-cta {
-		display: flex;
-		align-items: center;
-		gap: 14px;
-		padding: 14px 16px;
-		border-radius: 16px;
-		text-decoration: none;
-		background: linear-gradient(100deg, #b45309 0%, #dc2626 55%, #7c3aed 100%);
-	}
-	.rep-orb {
-		width: 44px; height: 44px;
-		border-radius: 12px;
-		display: grid; place-items: center;
-		font-size: 22px;
-		background: rgba(255,255,255,0.16);
-		flex-shrink: 0;
-	}
-	.rep-go {
-		font-size: 13px;
-		font-weight: 800;
-		color: #1d1d2e;
-		background: #fff;
-		padding: 10px 14px;
-		border-radius: 12px;
-		box-shadow: 0 8px 22px -8px rgba(0,0,0,0.5);
-	}
+	/* `.cta-service` (+ orb, go) stă în app.css: același card apare și pe Acasă,
+	   iar gama nu trebuie ținută sincronizată în două fișiere. */
 	.rep-mini {
 		display: flex;
 		gap: 10px;

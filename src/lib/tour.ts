@@ -71,7 +71,7 @@ export function startTour(opts: { force?: boolean } = {}): void {
 		id: 'masina',
 		attachTo: { element: '[data-tour="masina"]', on: 'bottom' },
 		title: 'Mașina ta și statusul',
-		text: 'Aici vezi <strong>mașina principală</strong> cu statusul curent. Când e în service apar detaliile reparației și butonul <strong>Programează-te</strong> pentru o nouă vizită.',
+		text: 'Aici vezi <strong>mașina principală</strong> cu statusul curent. Când e în service apar detaliile reparației, iar <strong>programarea</strong> are cardul ei chiar dedesubt.',
 		buttons: [
 			btn('← Înapoi', () => tour.back(), true),
 			btn('Următorul →', () => tour.next()),

@@ -54,6 +54,62 @@ body {
 	.fundal-modal { animation: none; }
 }
 
+/* ── Cardul de service — un singur loc de adevăr ────────────────────────────
+   Îndemnul cald (chihlimbar → roșu → violet) apare în două locuri: pe Acasă,
+   sub mașină, și pe Reparații, când clientul n-are nicio lucrare activă. Erau
+   aceleași reguli scrise de două ori, în stilurile scoped ale fiecărei pagini;
+   acum stau aici, ca schimbarea gamei să nu însemne două fișiere care o iau
+   razna una fără alta. Gama e DIFERITĂ de cea a închirierilor (teal → albastru
+   → violet) intenționat: pe Acasă cele două carduri stau unul sub altul și
+   trebuie să se citească drept două lucruri diferite, nu două benzi la fel. */
+.cta-service {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	padding: 14px 16px;
+	border-radius: 16px;
+	text-decoration: none;
+	background: linear-gradient(100deg, #b45309 0%, #dc2626 55%, #7c3aed 100%);
+	border: 1px solid rgba(255, 255, 255, 0.18);
+	box-shadow: 0 10px 28px -10px rgba(220, 38, 38, 0.5);
+}
+.cta-service-orb {
+	width: 44px;
+	height: 44px;
+	border-radius: 12px;
+	display: grid;
+	place-items: center;
+	font-size: 22px;
+	background: rgba(255, 255, 255, 0.16);
+	border: 1px solid rgba(255, 255, 255, 0.28);
+	flex-shrink: 0;
+}
+.cta-service-go {
+	font-size: 13px;
+	font-weight: 800;
+	color: #1d1d2e;
+	background: #fff;
+	padding: 10px 14px;
+	border-radius: 12px;
+	box-shadow: 0 8px 22px -8px rgba(0, 0, 0, 0.5);
+	white-space: nowrap;
+	flex-shrink: 0;
+}
+/* Ora programării — singura pastilă din card; galbenul o scoate din gradient
+   fără să se bată cu butonul alb din dreapta. */
+.cta-service-ora {
+	display: inline-block;
+	margin-left: 8px;
+	vertical-align: 2px;
+	font-size: 12px;
+	font-weight: 800;
+	color: #2b1503;
+	background: #fcd34d;
+	padding: 3px 8px;
+	border-radius: 999px;
+	white-space: nowrap;
+}
+
 /* ── Shepherd.js dark theme ───────────────────────────────────── */
 .shepherd-element {
 	background: var(--surface) !important;
