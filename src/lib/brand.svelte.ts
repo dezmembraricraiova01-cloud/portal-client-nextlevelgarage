@@ -29,7 +29,10 @@ const NLG: Marca = {
 	nume: 'NLG Portal',
 	accentDeLa: null,
 	subtitlu: 'Servicii auto premium — la un SMS distanță',
-	subsol: 'Next Level Garage · Servicii auto Cluj-Napoca'
+	// Craiova, nu Cluj-Napoca: atelierul e pe Str. Râului nr. 391 (Setări → Date
+	// firmă, firma NLG). Subsolul ăsta e pe ecranul de login, deci orașul greșit
+	// era primul lucru pe care-l citea un client nou.
+	subsol: 'Next Level Garage · Servicii auto Craiova'
 };
 
 // Scrisa exact ca in magazin: „Piesa" + „365" pe culoarea de accent. Subsolul e
