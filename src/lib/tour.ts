@@ -93,7 +93,7 @@ export function startTour(opts: { force?: boolean } = {}): void {
 		id: 'nav',
 		attachTo: { element: '[data-tour="nav"]', on: 'top' },
 		title: 'Navigare rapidă',
-		text: 'Folosește bara de jos pentru a trece între <strong>Acasă</strong>, <strong>Mașini</strong>, <strong>Reparații</strong>, <strong>Călătorii</strong>, alerte și profil.',
+		text: 'Folosește bara de jos pentru a trece între <strong>Acasă</strong>, <strong>Mașini</strong>, <strong>Reparații</strong>, <strong>Călătorii</strong>, alerte și <strong>Închirieri</strong>. Profilul îl găsești sus, lângă numele tău.',
 		buttons: [
 			btn('← Înapoi', () => tour.back(), true),
 			btn('Următorul →', () => tour.next()),
