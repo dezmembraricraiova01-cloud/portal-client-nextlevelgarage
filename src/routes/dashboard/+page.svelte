@@ -8,6 +8,7 @@
 	import ProgressStepper from '$lib/ProgressStepper.svelte';
 	import { startTour } from '$lib/tour';
 	import { activeWoUid } from '$lib/stores';
+	import { atelier, atelierLinie, incarcaAtelier } from '$lib/atelier';
 
 	let data          = $state<GarajDashboard | null>(null);
 	let timeline      = $state<TimelineStep[]>([]);
@@ -25,12 +26,19 @@
 	/** „29 de mașini", dar „19 mașini" — numeralul românesc cere „de" abia de la 20. */
 	const numarMasini = (n: number) => n === 1 ? 'o mașină' : `${n} ${n < 20 ? 'mașini' : 'de mașini'}`;
 
+	/** Programarea următoare; decide singură cele două stări ale cardului de service. */
+	const prog = $derived(data?.urmatoarea_programare ?? null);
+
 	function zileRamase(iso: string | null): number {
 		if (!iso) return 999;
 		return Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
 	}
 
 	onMount(async () => {
+		// Atelierul de pe cardul de service — la fel, în afara try-ului: dacă pică,
+		// cardul rămâne fără rândul cu adresa, nu fără card.
+		incarcaAtelier();
+
 		// Vitrina bannerului — în afara try-ului de mai jos: eșecul ei nu trimite
 		// la login, doar lasă bannerul fără poze și cifre.
 		api.inchirieriFlota()
@@ -165,30 +173,6 @@
 				</div>
 			</div>
 
-			{#snippet programareChip(overlay: boolean)}
-				<!-- `data` e non-null aici (snippetul trăiește sub `{:else if data}`), dar
-				     îngustarea nu trece granița snippetului: el se compilează ca funcție
-				     separată. Citim o dată, cu `?.`, și restul se leagă de `p`. -->
-				{@const p = data?.urmatoarea_programare}
-				{#if p}
-					<a href="/dashboard/programari"
-						class="hero-pill {overlay ? 'is-overlay' : ''} group inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full">
-						<span class="hero-pill-icon">📅</span>
-						<span style="color: var(--text)">{new Date(p.start_at).toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-						<span class="hero-pill-accent">· {new Date(p.start_at).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}</span>
-						<span class="hero-pill-arrow">→</span>
-					</a>
-				{:else}
-					<a href="/dashboard/programari/noua"
-						class="hero-pill hero-pill--cta {overlay ? 'is-overlay' : ''} group relative inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-full overflow-hidden">
-						<span class="hero-pill-shimmer absolute inset-0 pointer-events-none"></span>
-						<span class="relative">📅</span>
-						<span class="relative">Programează-te</span>
-						<span class="relative hero-pill-arrow">→</span>
-					</a>
-				{/if}
-			{/snippet}
-
 			{#snippet showroomBg()}
 				<!-- Fundal showroom: reflector + dâre de lumină + siluetă mașină (fallback fără poză) -->
 				<div class="sh-bg absolute inset-0"></div>
@@ -267,9 +251,6 @@
 										</a>
 									{/if}
 								</div>
-								<div class="shrink-0">
-									{@render programareChip(true)}
-								</div>
 							</div>
 						</div>
 					</div>
@@ -307,9 +288,6 @@
 											⚠️ Deviz în așteptare →
 										</a>
 									{/if}
-								</div>
-								<div class="shrink-0">
-									{@render programareChip(true)}
 								</div>
 							</div>
 						</div>
@@ -359,9 +337,6 @@
 									<span class="text-sm font-bold leading-none" style="color: #22c55e">În regulă</span>
 									<span class="text-[11px] leading-none" style="color: var(--muted)">· niciun service activ</span>
 								</div>
-								<div class="shrink-0">
-									{@render programareChip(true)}
-								</div>
 							</div>
 						</div>
 					</div>
@@ -385,9 +360,6 @@
 									<span class="hero-status-dot" style="background: #22c55e"></span>
 									<span class="text-sm font-bold leading-none" style="color: #22c55e">În regulă</span>
 									<span class="text-[11px] leading-none" style="color: var(--muted)">· niciun service activ</span>
-								</div>
-								<div class="shrink-0">
-									{@render programareChip(true)}
 								</div>
 							</div>
 						</div>
@@ -427,9 +399,6 @@
 							<div class="flex-1 min-w-0">
 								<span class="text-[11px] leading-none" style="color: var(--muted)">Reparații, programări și alerte — toate legate de mașina ta.</span>
 							</div>
-							<div class="shrink-0">
-								{@render programareChip(true)}
-							</div>
 						</div>
 					</div>
 				</div>
@@ -447,6 +416,39 @@
 		</div><!-- /hero-zone -->
 
 			<!-- ③ Acțiunea principală — eliminata (redundant cu hero status) -->
+
+		<!-- ③b CTA service — programarea era o pastilă de 12px lipită în colțul
+		     bannerului, cu aceeași greutate ca eticheta de status de lângă ea, în
+		     timp ce închirierea (care aduce mai puțini oameni în portal decât
+		     service-ul) avea un card lat. Acum are același card, în gama caldă de
+		     pe Reparații, cu două stări: invitația, când n-are programare, și
+		     programarea lui, când are. Adresa atelierului rămâne pe amândouă și
+		     rezistă pe telefon — omul care vine la service vrea să știe unde vine;
+		     rândul de dedesubt e primul care pică pe îngust. -->
+		<a href={prog ? '/dashboard/programari' : '/dashboard/programari/noua'}
+			data-reveal data-delay="0.05"
+			class="cta-service transition-all active:scale-[0.985]">
+			<span class="cta-service-orb">{prog ? '📅' : '🔧'}</span>
+			<span class="flex-1 min-w-0">
+				<b class="block text-[15px] leading-tight tracking-tight" style="color: #fff">
+					{#if prog}
+						Ești programat {new Date(prog.start_at).toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' })}<span
+							class="cta-service-ora">{new Date(prog.start_at).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}</span>
+					{:else}
+						Programează-te la service
+					{/if}
+				</b>
+				{#if $atelier}
+					<span class="block text-xs font-semibold mt-0.5 truncate" style="color: rgba(255,255,255,0.94)">
+						{atelierLinie($atelier)}
+					</span>
+				{/if}
+				<span class="hidden sm:block text-[11px] mt-px" style="color: rgba(255,255,255,0.7)">
+					{prog ? 'adu mașina cu 10 minute înainte' : 'diagnoză pe loc · mașină de schimb cât durează reparația'}
+				</span>
+			</span>
+			<span class="cta-service-go">{prog ? 'Vezi / mută →' : 'Alege ziua →'}</span>
+		</a>
 
 		<!-- ④ CTA închiriere — vitrină, nu doar îndemn: „Ai nevoie de o mașină?" pe
 		     un gradient gol putea însemna orice, inclusiv vânzare. Titlul spune
@@ -682,62 +684,8 @@
 		50%      { box-shadow: 0 0 0 6px color-mix(in srgb, var(--ac, #22c55e) 8%,  transparent); }
 	}
 
-	/* Hero pill — programare existentă (subtilă) */
-	.hero-pill {
-		text-decoration: none;
-		background: rgba(59,130,246,0.18);
-		border: 1px solid rgba(59,130,246,0.45);
-		color: #93c5fd;
-		transition: transform 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
-	}
-	.hero-pill.is-overlay {
-		backdrop-filter: blur(6px);
-		-webkit-backdrop-filter: blur(6px);
-	}
-	.hero-pill:hover {
-		transform: translateY(-1px);
-		background: rgba(59,130,246,0.28);
-		box-shadow: 0 6px 16px -8px rgba(59,130,246,0.6);
-	}
-	.hero-pill-accent { color: #93c5fd; }
-	.hero-pill-arrow {
-		display: inline-block;
-		transition: transform 0.25s ease;
-	}
-	.hero-pill:hover .hero-pill-arrow { transform: translateX(3px); }
-
-	/* Hero pill — CTA wow (fără programare) */
-	.hero-pill--cta {
-		background: linear-gradient(135deg, #3b82f6 0%, #6366f1 50%, #8b5cf6 100%);
-		border: 1px solid rgba(255,255,255,0.22);
-		color: #fff;
-		box-shadow:
-			0 1px 0 rgba(255,255,255,0.22) inset,
-			0 8px 22px -6px rgba(99,102,241,0.7),
-			0 0 0 0 rgba(99,102,241,0.55);
-		animation: ctaGlow 2.6s ease-in-out infinite;
-	}
-	.hero-pill--cta:hover {
-		transform: translateY(-1px);
-		background: linear-gradient(135deg, #4f8cff 0%, #7c7cff 50%, #9d6dff 100%);
-	}
-	@keyframes ctaGlow {
-		0%, 100% { box-shadow: 0 1px 0 rgba(255,255,255,0.22) inset, 0 8px 22px -6px rgba(99,102,241,0.7), 0 0 0 0 rgba(99,102,241,0.0); }
-		50%      { box-shadow: 0 1px 0 rgba(255,255,255,0.22) inset, 0 10px 26px -6px rgba(99,102,241,0.85), 0 0 0 6px rgba(99,102,241,0.0); }
-	}
-	.hero-pill-shimmer {
-		background: linear-gradient(110deg, transparent 35%, rgba(255,255,255,0.35) 50%, transparent 65%);
-		transform: translateX(-100%);
-		animation: pillShimmer 3.2s ease-in-out infinite;
-		mix-blend-mode: overlay;
-	}
-	@keyframes pillShimmer {
-		0%, 25%   { transform: translateX(-100%); }
-		70%, 100% { transform: translateX(100%); }
-	}
-
 	@media (prefers-reduced-motion: reduce) {
-		.hero-dock-aurora, .hero-status-dot, .hero-pill--cta, .hero-pill-shimmer { animation: none; }
+		.hero-dock-aurora, .hero-status-dot { animation: none; }
 	}
 
 	/* ===== Showroom — hero fallback fără poză ===== */
