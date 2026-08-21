@@ -5,6 +5,8 @@
 	import { api, type MasiniMini, type TipServiciu, type ZiBlocata } from '$lib/api';
 	import Skeleton from '$lib/Skeleton.svelte';
 	import { sortable } from '$lib/sortable';
+	import { atelier, incarcaAtelier } from '$lib/atelier';
+	import { marca } from '$lib/brand.svelte';
 
 	// Reprogramare: vine din /programari prin query ?reprogramare={id}&nr={plate}&tip={cod}
 	const reprogramareId = $derived(Number(page.url.searchParams.get('reprogramare')) || null);
@@ -142,7 +144,28 @@
 		return { stare: 'liber' };
 	}
 
+	/**
+	 * Pasul 1 era nouă pătrate goale: omul venit din Piesa365 nu știe unde e
+	 * atelierul, cine îi montează piesa sau ce face cu mașina cât stă în service.
+	 * Heroul de deasupra grilei spune asta înainte să i se ceară o alegere.
+	 *
+	 * Poza e prima din galeria de service (Setări → Portal clienți); fără ea
+	 * rămâne fundalul, fără atelier nu se afișează deloc — pasul 1 arată ca azi.
+	 */
+	let pozaAtelier = $state<string | null>(null);
+	const dinShop   = $derived(marca.val.cheie === 'piesa365');
+	const hartaUrl  = $derived(
+		$atelier?.adresa
+			? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${$atelier.denumire} ${$atelier.adresa}`)}`
+			: null,
+	);
+
 	onMount(async () => {
+		incarcaAtelier();
+		api.serviceGalerie()
+			.then((res) => (pozaAtelier = res.galerie[0]?.url ?? null))
+			.catch(() => {});
+
 		try {
 			const cfg = await api.programariConfig();
 			ore            = cfg.ore;
@@ -284,6 +307,41 @@
 	<!-- PAS 1 — Ce serviciu? -->
 	<!-- ═══════════════════════════════════════════════════ -->
 	{:else if pas === 1}
+		{#if $atelier}
+			<!-- Cine suntem, înainte de „alege un pătrat". Textul urmează sursa: cine
+			     vine din magazin aude puntea (piesa lui, montată aici), cine vine
+			     direct aude atelierul. -->
+			<section class="ate-hero">
+				{#if pozaAtelier}
+					<img src={pozaAtelier} alt="" class="ate-poza" loading="lazy" />
+				{/if}
+				<div class="ate-val"></div>
+
+				<div class="ate-text">
+					<p class="ate-eyebrow">{dinShop ? 'Piesa cumpărată · montată de noi' : 'Atelierul tău'}</p>
+					<h2 class="ate-nume">{$atelier.denumire}</h2>
+					<p class="ate-pitch">
+						{dinShop
+							? 'Ai luat piesa din Piesa365 — ți-o montăm noi, în același loc de unde a plecat.'
+							: 'Lași mașina, urmărești lucrarea din portal și aprobi devizul de pe telefon.'}
+					</p>
+
+					<div class="ate-rand">
+						{#if $atelier.adresa}
+							<span class="ate-pastila">📍 {$atelier.adresa}</span>
+						{/if}
+						<span class="ate-pastila">🚗 Mașină de schimb cât durează</span>
+						<span class="ate-pastila">🔍 Diagnoză pe loc</span>
+						{#if hartaUrl}
+							<a href={hartaUrl} target="_blank" rel="noopener noreferrer" class="ate-harta">
+								Vezi pe hartă →
+							</a>
+						{/if}
+					</div>
+				</div>
+			</section>
+		{/if}
+
 		<div>
 			<h1 class="text-xl font-bold" style="color: var(--text)">Cu ce te putem ajuta?</h1>
 			<p class="text-sm mt-1" style="color: var(--muted)">Alege tipul de serviciu</p>
@@ -565,6 +623,93 @@
 {/if}
 
 <style>
+	/* === Heroul atelierului (pasul 1) ===================================== */
+	.ate-hero {
+		position: relative;
+		height: 190px;
+		border-radius: 18px;
+		overflow: hidden;
+		border: 1px solid var(--border);
+		/* Fundalul de sub poză: fără nicio poză în galerie, heroul rămâne o hală
+		   întunecată, nu o cutie neagră goală. */
+		background: radial-gradient(120% 95% at 50% 25%, #2c3a68 0%, #161c38 55%, #10162c 100%);
+		isolation: isolate;
+	}
+	@media (max-width: 480px) { .ate-hero { height: 165px; } }
+
+	.ate-poza {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	/* Vălul începe abia pe la jumătate: peste toată înălțimea stingea poza. */
+	.ate-val {
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(180deg,
+			rgba(13,13,34,0.10) 0%,
+			rgba(13,13,34,0.30) 42%,
+			rgba(13,13,34,0.86) 78%,
+			rgba(13,13,34,0.96) 100%);
+	}
+	.ate-text {
+		position: absolute;
+		left: 0; right: 0; bottom: 0;
+		padding: 14px 16px;
+	}
+	.ate-eyebrow {
+		margin: 0;
+		font-size: 10px;
+		font-weight: 700;
+		letter-spacing: 0.13em;
+		text-transform: uppercase;
+		color: #fcd34d;
+	}
+	.ate-nume {
+		margin: 5px 0 0;
+		font-size: 19px;
+		font-weight: 800;
+		letter-spacing: -0.02em;
+		color: #fff;
+	}
+	.ate-pitch {
+		margin: 4px 0 0;
+		font-size: 12.5px;
+		color: rgba(255,255,255,0.85);
+	}
+	.ate-rand {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin-top: 10px;
+	}
+	.ate-pastila {
+		font-size: 11px;
+		font-weight: 700;
+		color: #fff;
+		background: rgba(255,255,255,0.14);
+		border: 1px solid rgba(255,255,255,0.24);
+		border-radius: 999px;
+		padding: 5px 10px;
+		backdrop-filter: blur(4px);
+	}
+	/* Pe îngust rămâne adresa; restul dovezilor cad, ca rândul să nu se rupă în trei. */
+	@media (max-width: 480px) {
+		.ate-pastila:not(:first-child) { display: none; }
+	}
+	.ate-harta {
+		font-size: 11px;
+		font-weight: 800;
+		color: #1d1d2e;
+		background: #fff;
+		border-radius: 999px;
+		padding: 5px 11px;
+		text-decoration: none;
+		box-shadow: 0 8px 22px -8px rgba(0,0,0,0.5);
+	}
+
 	/* === Carduri-zi premium compact === */
 	.zi-card {
 		font-feature-settings: 'tnum';
