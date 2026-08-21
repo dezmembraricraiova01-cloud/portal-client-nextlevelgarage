@@ -149,6 +149,11 @@
 	 * atelierul, cine îi montează piesa sau ce face cu mașina cât stă în service.
 	 * Heroul de deasupra grilei spune asta înainte să i se ceară o alegere.
 	 *
+	 * Textul pentru cel venit din magazin vorbește despre MONTAJ, nu despre
+	 * „piesa noastră": Piesa365 e altă firmă, iar Next Level Garage e serviciul
+	 * ei de casă. Prima variantă spunea că piesa „a plecat din același loc" —
+	 * ceea ce nu e adevărat și amestecă două firme.
+	 *
 	 * Poza e prima din galeria de service (Setări → Portal clienți); fără ea
 	 * rămâne fundalul, fără atelier nu se afișează deloc — pasul 1 arată ca azi.
 	 */
@@ -318,11 +323,11 @@
 				<div class="ate-val"></div>
 
 				<div class="ate-text">
-					<p class="ate-eyebrow">{dinShop ? 'Piesa cumpărată · montată de noi' : 'Atelierul tău'}</p>
+					<p class="ate-eyebrow">{dinShop ? 'Serviciul de casă Piesa365' : 'Atelierul tău'}</p>
 					<h2 class="ate-nume">{$atelier.denumire}</h2>
 					<p class="ate-pitch">
 						{dinShop
-							? 'Ai luat piesa din Piesa365 — ți-o montăm noi, în același loc de unde a plecat.'
+							? 'Ai luat o piesă din Piesa365? Te ajutăm cu montajul — alege mai jos ce ai nevoie și îți spunem ce presupune și cât durează.'
 							: 'Lași mașina, urmărești lucrarea din portal și aprobi devizul de pe telefon.'}
 					</p>
 
