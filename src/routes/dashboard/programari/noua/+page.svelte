@@ -1,7 +1,10 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { gsap } from 'gsap';
+	import { DrawSVGPlugin } from 'gsap/DrawSVGPlugin';
+	import { SplitText } from 'gsap/SplitText';
 	import { api, type MasiniMini, type TipServiciu, type ZiBlocata } from '$lib/api';
 	import Skeleton from '$lib/Skeleton.svelte';
 	import { sortable } from '$lib/sortable';
@@ -24,8 +27,12 @@
 	let saving          = $state(false);
 	let error           = $state('');
 
+	gsap.registerPlugin(DrawSVGPlugin, SplitText);
+
 	// Form state
 	let pas              = $state<1 | 2 | 3>(1);
+	/** Etapa 4: cererea a plecat. Nu mai plecăm din pagină — răspunsul se dă aici. */
+	let trimis           = $state(false);
 	let tipSelectat      = $state('');
 	let masinaSelectata  = $state('');
 	let dataSelectata    = $state('');
@@ -228,6 +235,107 @@
 		pas = 3;
 	}
 
+	/**
+	 * „Schimbă" de pe o etapă închisă: firul se retrage până acolo. Etapele de
+	 * după se golesc, altfel ar rămâne un răspuns fără întrebare (ai schimbat
+	 * serviciul, dar ora aleasă pentru vechiul serviciu stă mai jos).
+	 */
+	function inapoiLa(n: 1 | 2 | 3) {
+		if (trimis) return;
+		if (n === 1) { dataSelectata = ''; oraSelectata = ''; }
+		pas = n;
+	}
+
+	/** Unde e omul pe fir: 1–3 cât alege, 4 după ce a trimis cererea. */
+	const etapaCurenta = $derived(trimis ? 4 : pas);
+	const stareEt = (n: number) =>
+		etapaCurenta > n ? 'gata' : etapaCurenta === n ? 'acum' : 'viitor';
+
+
+	// ── Coregrafia ────────────────────────────────────────────────────────────
+	// Fiecare mișcare răspunde la o întrebare pe care omul o are exact atunci:
+	// unde s-a dus alegerea mea (Flip), s-a închis pasul? (bifa desenată), mai
+	// e mult? (firul care curge), unde mă uit acum? (inelul care pulsează).
+	const reducedMotion = () =>
+		typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+	/** Etapa care tocmai s-a închis: bifa se desenează, firul curge spre următoarea. */
+	function inchideEtapa(n: number) {
+		if (reducedMotion()) return;
+		const et = document.querySelector(`[data-etapa="${n}"]`);
+		if (!et) return;
+
+		const tl = gsap.timeline();
+		const bifa = et.querySelector('.et-bifa path');
+		if (bifa) tl.fromTo(bifa, { drawSVG: '0%' }, { drawSVG: '100%', duration: 0.34, ease: 'power2.inOut' }, 0.1);
+		const linie = et.querySelector('.et-linie i');
+		if (linie) tl.fromTo(linie, { scaleY: 0 }, { scaleY: 1, duration: 0.45, ease: 'power2.out' }, 0.05);
+		const rez = et.querySelector('.et-rezumat');
+		if (rez) tl.from(rez, { opacity: 0, y: 6, duration: 0.3, ease: 'power2.out' }, 0.14);
+
+		const urm = document.querySelector(`[data-etapa="${n + 1}"] .et-corp`);
+		if (urm) tl.from(urm, { opacity: 0, y: 10, duration: 0.4, ease: 'power2.out' }, 0.3);
+	}
+
+	/**
+	 * Pătratul ales zboară în rezumat: „unde s-a dus alegerea mea?" — acolo, o vezi.
+	 *
+	 * Se zboară o CLONĂ fixată, nu elementul: originalul dispare odată cu grila
+	 * (Svelte îl scoate din DOM la schimbarea pasului), iar un element care nu
+	 * mai există nu poate fi animat. Se cheamă din `onclick`, cât timp mai are
+	 * poziție de citit.
+	 */
+	function zboaraInFir(sursa: HTMLElement) {
+		if (reducedMotion()) return;
+		const a = sursa.getBoundingClientRect();
+		const clona = sursa.cloneNode(true) as HTMLElement;
+		Object.assign(clona.style, {
+			position: 'fixed', left: `${a.left}px`, top: `${a.top}px`,
+			width: `${a.width}px`, height: `${a.height}px`, margin: '0',
+			zIndex: '60', pointerEvents: 'none',
+		});
+		document.body.appendChild(clona);
+
+		tick().then(() => {
+			const tinta = document.querySelector('[data-etapa="1"] .et-rezumat-ic');
+			if (!tinta) { clona.remove(); return; }
+			const t = tinta.getBoundingClientRect();
+			gsap.to(clona, {
+				duration: 0.5, ease: 'power2.inOut',
+				x: t.left - a.left + (t.width - a.width) / 2,
+				y: t.top - a.top + (t.height - a.height) / 2,
+				scale: t.width / a.width,
+				borderRadius: 8,
+				onComplete: () => {
+					clona.remove();
+					gsap.fromTo(tinta, { scale: 1.25 }, { scale: 1, duration: 0.26, ease: 'back.out(2)' });
+				},
+			});
+		});
+	}
+
+	/** Mesajul de final intră cuvânt cu cuvânt — se citește ca o vorbă, nu ca un toast. */
+	function scrieFinalul() {
+		if (reducedMotion()) return;
+		const el = document.querySelector('.et-final-mesaj');
+		if (!el) return;
+		const split = new SplitText(el, { type: 'words' });
+		gsap.from(split.words, { opacity: 0, y: 7, duration: 0.36, stagger: 0.065, ease: 'power2.out', delay: 0.1 });
+	}
+
+	// Coregrafia se leagă de starea firului, nu de fiecare buton în parte.
+	let etapaAnterioara = 1;
+	$effect(() => {
+		const acum = trimis ? 4 : pas;
+		if (acum > etapaAnterioara) {
+			tick().then(() => {
+				inchideEtapa(acum - 1);
+				if (acum === 4) scrieFinalul();
+			});
+		}
+		etapaAnterioara = acum;
+	});
+
 	async function confirma() {
 		error = '';
 		saving = true;
@@ -243,7 +351,9 @@
 			if (reprogramareId) {
 				try { await api.anulareProgramare(reprogramareId); } catch { /* nefatal — userul vede ambele în listă */ }
 			}
-			goto('/dashboard/programari');
+			// Nu-l mai aruncăm într-o listă: drumul se termină unde a început, cu
+			// etapa 4 — „am primit cererea, îți confirmăm ora". Lista e la un clic.
+			trimis = true;
 		} catch (e: any) {
 			error = e.message ?? 'Eroare la salvare.';
 			// 409 = slot ocupat intre timp → reincarca sloturile si trimite-l inapoi la pas 2
@@ -265,6 +375,11 @@
 	const dataFormatat = $derived(dataSelectata
 		? new Date(dataSelectata + 'T00:00:00').toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' })
 		: '');
+
+	/** Rezumatul etapei 2: ziua și ora, într-un rând. */
+	const rezumatCand = $derived(
+		dataSelectata && oraSelectata ? `${dataFormatat} · ${oraSelectata}` : '',
+	);
 </script>
 
 <div class="space-y-6">
@@ -290,13 +405,6 @@
 		</div>
 	{/if}
 
-	<!-- Progress indicator -->
-	<div class="flex items-center gap-2">
-		{#each [1, 2, 3] as nr}
-			<div class="flex-1 h-1 rounded-full transition-all"
-				style="background: {pas >= nr ? 'var(--accent)' : 'var(--border)'}"></div>
-		{/each}
-	</div>
 
 	{#if loading}
 		<div class="space-y-3">
@@ -309,9 +417,9 @@
 		</div>
 
 	<!-- ═══════════════════════════════════════════════════ -->
-	<!-- PAS 1 — Ce serviciu? -->
+	<!-- FIRUL — patru etape, nu trei ecrane -->
 	<!-- ═══════════════════════════════════════════════════ -->
-	{:else if pas === 1}
+	{:else}
 		{#if $atelier}
 			<!-- Cine suntem, înainte de „alege un pătrat". Textul urmează sursa: cine
 			     vine din magazin aude puntea (piesa lui, montată aici), cine vine
@@ -347,44 +455,99 @@
 			</section>
 		{/if}
 
-		<div>
-			<h1 class="text-xl font-bold" style="color: var(--text)">Cu ce te putem ajuta?</h1>
-			<p class="text-sm mt-1" style="color: var(--muted)">Alege tipul de serviciu</p>
-		</div>
+		<!-- ═══════════════════════════════════════════════════════════════════
+		     FIRUL — cele trei întrebări plus răspunsul atelierului.
+		     Nu mai sunt trei ecrane care se înlocuiesc, ci o conversație care
+		     ține minte: fiecare răspuns rămâne la vedere, cu „schimbă" lângă,
+		     iar etapa 4 e vizibilă de la început, ștearsă, ca omul să știe din
+		     prima că drumul se termină cu un răspuns de la noi.
+		═══════════════════════════════════════════════════════════════════ -->
 
-		<div class="grid grid-cols-3 gap-3" use:sortable={{ key: 'programari-tip-serviciu', idAttr: 'data-sort-id' }}>
-			{#each tipuriServiciu as tip}
-				<button
-					data-sort-id={tip.cod}
-					onclick={() => selectTip(tip.cod)}
-					class="flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all active:scale-95 text-center"
-					style="background: var(--surface); border-color: {tipSelectat === tip.cod ? 'var(--accent)' : 'var(--border)'};">
-					<span class="text-2xl">{tip.icon}</span>
-					<span class="text-xs font-medium leading-tight" style="color: var(--text)">{tip.label}</span>
-				</button>
-			{/each}
-		</div>
-
-	<!-- ═══════════════════════════════════════════════════ -->
-	<!-- PAS 2 — Când și cu ce mașină? -->
-	<!-- ═══════════════════════════════════════════════════ -->
-	{:else if pas === 2}
-		<div class="flex items-start justify-between gap-4 flex-wrap">
-			<div>
-				<h1 class="text-xl font-bold" style="color: var(--text)">{tipLabel}</h1>
-				<p class="text-sm mt-1" style="color: var(--muted)">Alege data și ora</p>
+		<!-- ETAPA 1 — ce are mașina -->
+		<section class="et {stareEt(1)}" data-etapa="1">
+			<div class="et-stanga">
+				<span class="et-bul">
+					<span class="et-nr">1</span>
+					<svg class="et-bifa" viewBox="0 0 18 18" aria-hidden="true"><path d="M3.5 9.5 L7.2 13 L14.5 5" /></svg>
+					<span class="et-inel"></span>
+				</span>
+				<span class="et-linie"><i></i></span>
 			</div>
-			{#if masini.length === 1}
-				<div class="flex items-center gap-2.5 px-3.5 py-2 rounded-xl border shrink-0"
-					style="background: var(--surface); border-color: var(--border);">
-					<span class="text-lg">🚗</span>
-					<div class="leading-tight">
-						<p class="text-sm font-semibold" style="color: var(--text)">{masini[0].numar_inmatriculare}</p>
-						<p class="text-[11px]" style="color: var(--muted)">{masini[0].marca} {masini[0].model}</p>
+			<div class="et-corp">
+				<p class="et-intrebare">Ce are mașina?</p>
+				{#if etapaCurenta === 1}
+					<p class="et-ajutor">Spune-ne pe scurt — dacă nu știi, e în regulă.</p>
+
+					<div class="et-raspuns">
+						<div class="grid grid-cols-3 gap-3" use:sortable={{ key: 'programari-tip-serviciu', idAttr: 'data-sort-id' }}>
+							{#each tipuriServiciu.filter(t => t.cod !== 'diagnoza') as tip}
+								<button
+									data-sort-id={tip.cod}
+									onclick={(e) => { zboaraInFir(e.currentTarget); selectTip(tip.cod); }}
+									class="flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all active:scale-95 text-center"
+									style="background: var(--surface); border-color: {tipSelectat === tip.cod ? 'var(--accent)' : 'var(--border)'};">
+									<span class="text-2xl">{tip.icon}</span>
+									<span class="text-xs font-medium leading-tight" style="color: var(--text)">{tip.label}</span>
+								</button>
+							{/each}
+						</div>
+
+						<!-- „Nu știu ce are" — stă în afara grilei sortabile: e un răspuns, nu
+						     un tip de serviciu pe care clientul să-l poată rearanja. Duce la
+						     diagnoză, care există deja în catalog. -->
+						{#if tipuriServiciu.some(t => t.cod === 'diagnoza')}
+							<button
+								onclick={(e) => { zboaraInFir(e.currentTarget); selectTip('diagnoza'); }}
+								class="et-nustiu">
+								<span class="text-xl leading-none">🔍</span>
+								<span class="min-w-0 text-left">
+									<b>Nu știu ce are</b>
+									<em>ne uităm noi — diagnoză la venire</em>
+								</span>
+							</button>
+						{/if}
 					</div>
+				{:else}
+					<div class="et-rezumat">
+						<span class="et-rezumat-ic">{tipuriServiciu.find(t => t.cod === tipSelectat)?.icon ?? '🔧'}</span>
+						<span class="et-rezumat-val">{tipLabel}</span>
+						{#if !trimis}
+							<button type="button" class="et-schimba" onclick={() => inapoiLa(1)}>schimbă</button>
+						{/if}
+					</div>
+				{/if}
+			</div>
+		</section>
+
+		<!-- ETAPA 2 — când poate veni -->
+		<section class="et {stareEt(2)}" data-etapa="2">
+			<div class="et-stanga">
+				<span class="et-bul">
+					<span class="et-nr">2</span>
+					<svg class="et-bifa" viewBox="0 0 18 18" aria-hidden="true"><path d="M3.5 9.5 L7.2 13 L14.5 5" /></svg>
+					<span class="et-inel"></span>
+				</span>
+				<span class="et-linie"><i></i></span>
+			</div>
+			<div class="et-corp">
+				<p class="et-intrebare">Când poți veni?</p>
+				{#if etapaCurenta === 2}
+					<p class="et-ajutor">Îți arătăm doar zilele și orele libere.</p>
+					<div class="et-raspuns">
+
+	<!-- ═══════════════════════════════════════════════════ -->
+	<!-- (continuarea etapei 2 — calendarul si masina) -->
+	<!-- ═══════════════════════════════════════════════════ -->
+		{#if masini.length === 1}
+			<div class="flex items-center gap-2.5 px-3.5 py-2 rounded-xl border mb-3"
+				style="background: var(--surface); border-color: var(--border);">
+				<span class="text-lg">🚗</span>
+				<div class="leading-tight">
+					<p class="text-sm font-semibold" style="color: var(--text)">{masini[0].numar_inmatriculare}</p>
+					<p class="text-[11px]" style="color: var(--muted)">{masini[0].marca} {masini[0].model}</p>
 				</div>
-			{/if}
-		</div>
+			</div>
+		{/if}
 
 		<div class="space-y-4">
 			<!-- Selector mașină când există mai multe -->
@@ -512,17 +675,6 @@
 				</button>
 			{/if}
 
-			<!-- Notita -->
-			<div>
-				<p class="text-xs mb-2 font-medium" style="color: var(--muted)">Notițe (opțional)</p>
-				<textarea
-					bind:value={notita}
-					rows="2"
-					placeholder="Descrie pe scurt problema sau ce dorești..."
-					class="w-full px-4 py-3 rounded-xl text-sm outline-none resize-none"
-					style="background: var(--surface); border: 1px solid var(--border); color: var(--text);"></textarea>
-			</div>
-
 			{#if error}
 				<p class="text-sm text-red-400">{error}</p>
 			{/if}
@@ -534,44 +686,97 @@
 				style="background: var(--accent); color: white;">
 				Continuă →
 			</button>
-		</div>
-
-	<!-- ═══════════════════════════════════════════════════ -->
-	<!-- PAS 3 — Confirmare -->
-	<!-- ═══════════════════════════════════════════════════ -->
-	{:else if pas === 3}
-		<div>
-			<h1 class="text-xl font-bold" style="color: var(--text)">Confirmare</h1>
-			<p class="text-sm mt-1" style="color: var(--muted)">Verifică detaliile programării</p>
-		</div>
-
-		<div class="rounded-2xl border overflow-hidden" style="border-color: var(--border)">
-			{#each [
-				{ label: 'Serviciu',  value: tipLabel },
-				{ label: 'Mașina',   value: masinaNume ? `${masinaNume.numar_inmatriculare} — ${masinaNume.marca} ${masinaNume.model}` : masinaSelectata },
-				{ label: 'Data',     value: dataFormatat },
-				{ label: 'Ora',      value: oraSelectata },
-				...(notita ? [{ label: 'Notițe', value: notita }] : []),
-			] as row, i}
-				<div class="flex gap-4 px-4 py-3 {i > 0 ? 'border-t' : ''}"
-					style="background: var(--surface); border-color: var(--border);">
-					<span class="text-xs w-16 shrink-0 font-medium pt-0.5" style="color: var(--muted)">{row.label}</span>
-					<span class="text-sm" style="color: var(--text)">{row.value}</span>
+					</div>
 				</div>
-			{/each}
-		</div>
+				{:else if etapaCurenta > 2}
+					<div class="et-rezumat">
+						<span class="et-rezumat-ic">📅</span>
+						<span class="et-rezumat-val">
+							{rezumatCand}
+							<em>{masinaSelectata}{#if masinaNume} · {masinaNume.marca} {masinaNume.model}{/if}</em>
+						</span>
+						{#if !trimis}
+							<button type="button" class="et-schimba" onclick={() => inapoiLa(2)}>schimbă</button>
+						{/if}
+					</div>
+				{/if}
+			</div>
+		</section>
 
-		{#if error}
-			<p class="text-sm text-red-400 text-center">{error}</p>
-		{/if}
+	<!-- ═══════════════════════════════════════════════════ -->
+	<!-- (etapele 3 si 4) -->
+	<!-- ═══════════════════════════════════════════════════ -->
+		<!-- ETAPA 3 — ce mai știm despre mașină -->
+		<section class="et {stareEt(3)}" data-etapa="3">
+			<div class="et-stanga">
+				<span class="et-bul">
+					<span class="et-nr">3</span>
+					<svg class="et-bifa" viewBox="0 0 18 18" aria-hidden="true"><path d="M3.5 9.5 L7.2 13 L14.5 5" /></svg>
+					<span class="et-inel"></span>
+				</span>
+				<span class="et-linie"><i></i></span>
+			</div>
+			<div class="et-corp">
+				<p class="et-intrebare">Mai știm ceva despre mașină?</p>
+				{#if etapaCurenta === 3}
+					<p class="et-ajutor">
+						{#if dinShop}Adu piesa cumpărată din Piesa365 și talonul.{:else}Adu talonul. Orice detaliu ne ajută să fim gata când vii.{/if}
+					</p>
+					<div class="et-raspuns">
+						<textarea
+							bind:value={notita}
+							rows="2"
+							placeholder="ex: scârțâie la frânare de o săptămână, mai tare pe umed"
+							class="w-full px-4 py-3 rounded-xl text-sm outline-none resize-none"
+							style="background: var(--surface); border: 1px solid var(--border); color: var(--text);"></textarea>
 
-		<button
-			onclick={confirma}
-			disabled={saving}
-			class="w-full py-3.5 rounded-xl text-sm font-semibold disabled:opacity-40 transition-all"
-			style="background: var(--accent); color: white;">
-			{saving ? 'Se salvează...' : '✓ Confirmă programarea'}
-		</button>
+						{#if error}
+							<p class="text-sm text-red-400 mt-2">{error}</p>
+						{/if}
+
+						<!-- „Trimite cererea", nu „Confirmă": confirmarea o dă atelierul, la
+						     etapa 4. Butonul vechi promitea ceva ce lista contrazicea imediat,
+						     cu „⏳ Planificată". -->
+						<button
+							onclick={confirma}
+							disabled={saving}
+							class="et-trimite"
+							type="button">
+							{saving ? 'Se trimite…' : 'Trimite cererea →'}
+						</button>
+					</div>
+				{:else if etapaCurenta > 3}
+					<div class="et-rezumat">
+						<span class="et-rezumat-ic">📝</span>
+						<span class="et-rezumat-val">{notita || 'fără alte detalii'}</span>
+					</div>
+				{/if}
+			</div>
+		</section>
+
+		<!-- ETAPA 4 — răspunsul atelierului -->
+		<section class="et et-ultima {stareEt(4)}" data-etapa="4">
+			<div class="et-stanga">
+				<span class="et-bul">
+					<span class="et-nr">4</span>
+					<svg class="et-bifa" viewBox="0 0 18 18" aria-hidden="true"><path d="M3.5 9.5 L7.2 13 L14.5 5" /></svg>
+					<span class="et-inel"></span>
+				</span>
+			</div>
+			<div class="et-corp">
+				{#if trimis}
+					<p class="et-intrebare et-final-mesaj">Gata — am primit cererea.</p>
+					<p class="et-ajutor">Verificăm programul mecanicului și îți confirmăm ora aici, în portal.</p>
+					<p class="et-final-nota">
+						Până atunci programarea scrie <b>„⏳ Planificată"</b> — nu e o eroare, e etapa asta.
+					</p>
+					<a href="/dashboard/programari" class="et-final-link">Vezi programările mele →</a>
+				{:else}
+					<p class="et-intrebare">Îți confirmăm ora</p>
+					<p class="et-ajutor">după ce trimiți cererea</p>
+				{/if}
+			</div>
+		</section>
 	{/if}
 </div>
 
@@ -628,6 +833,118 @@
 {/if}
 
 <style>
+	/* === Firul conversației ================================================
+	   Patru etape sub același fir: întrebarea, răspunsul care rămâne la vedere
+	   și, la capăt, răspunsul atelierului. Stările vin din clasa pusă în
+	   markup (`gata` / `acum` / `viitor`), animația din GSAP — CSS-ul nu face
+	   decât să le arate. */
+	.et { display: grid; grid-template-columns: 30px 1fr; gap: 13px; }
+	.et-stanga { display: flex; flex-direction: column; align-items: center; }
+	.et-bul {
+		position: relative;
+		width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+		display: grid; place-items: center;
+		font-size: 12px; font-weight: 800;
+		background: var(--surface2); color: var(--muted);
+		border: 2px solid var(--border);
+		transition: background .3s ease, border-color .3s ease, color .3s ease;
+	}
+	.et-nr { transition: opacity .2s ease, transform .3s ease; }
+	.et-bifa { position: absolute; inset: 6px; opacity: 0; }
+	.et-bifa path {
+		fill: none; stroke: #052e1a; stroke-width: 3.2;
+		stroke-linecap: round; stroke-linejoin: round;
+	}
+	.et-inel { position: absolute; inset: -5px; border-radius: 50%; pointer-events: none; }
+
+	.et.acum .et-bul { background: var(--accent); color: #fff; border-color: var(--accent); }
+	.et.acum .et-inel { animation: etPuls 2.4s ease-out infinite; }
+	@keyframes etPuls {
+		0%   { box-shadow: 0 0 0 0 rgba(59,130,246,.40); }
+		70%  { box-shadow: 0 0 0 9px rgba(59,130,246,0); }
+		100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+	}
+	.et.gata .et-bul { background: var(--green, #22c55e); border-color: var(--green, #22c55e); }
+	.et.gata .et-nr  { opacity: 0; transform: scale(.4); }
+	.et.gata .et-bifa { opacity: 1; }
+	.et.viitor { opacity: .45; }
+	.et.viitor .et-ajutor { display: none; }
+
+	.et-linie {
+		flex: 1; width: 2px; min-height: 12px; margin: 4px 0;
+		border-radius: 2px; background: var(--border); overflow: hidden;
+	}
+	.et-linie i {
+		display: block; width: 100%; height: 100%; border-radius: 2px;
+		background: linear-gradient(180deg, #22c55e, #3b82f6);
+		transform: scaleY(0); transform-origin: top center;
+	}
+	.et.gata .et-linie i { transform: scaleY(1); }
+
+	.et-corp { padding-bottom: 18px; min-width: 0; }
+	.et.et-ultima .et-corp { padding-bottom: 0; }
+
+	.et-intrebare { font-size: 15px; font-weight: 700; letter-spacing: -.01em; line-height: 1.35; color: var(--text); }
+	.et.gata .et-intrebare { font-size: 12px; font-weight: 600; color: var(--muted); }
+	.et-ajutor { margin: 3px 0 0; font-size: 12.5px; color: var(--muted); }
+	.et-raspuns { padding-top: 12px; }
+
+	.et-rezumat { display: flex; align-items: center; gap: 10px; margin-top: 5px; }
+	.et-rezumat-ic {
+		width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0;
+		display: grid; place-items: center; font-size: 15px;
+		background: var(--surface2); border: 1px solid var(--border);
+	}
+	.et-rezumat-val { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 700; color: var(--text); }
+	.et-rezumat-val em {
+		display: block; font-style: normal; font-weight: 500;
+		font-size: 11.5px; color: var(--muted);
+	}
+	.et-schimba {
+		flex-shrink: 0;
+		font-size: 11px; font-weight: 700; color: var(--accent);
+		background: none; border: 1px solid rgba(59,130,246,.38);
+		border-radius: 9px; padding: 5px 10px; cursor: pointer;
+	}
+	.et-schimba:hover { background: rgba(59,130,246,.10); }
+
+	/* „Nu știu ce are" — răspunsul celui care nu se poate autodiagnostica. */
+	.et-nustiu {
+		width: 100%; margin-top: 10px;
+		display: flex; align-items: center; gap: 10px;
+		padding: 12px 14px; border-radius: 16px; text-align: left;
+		background: rgba(59,130,246,.10);
+		border: 1px solid rgba(59,130,246,.38);
+		transition: border-color .18s ease, transform .12s ease;
+	}
+	.et-nustiu:active { transform: scale(.98); }
+	.et-nustiu b  { display: block; font-size: 13px; font-weight: 700; color: var(--text); }
+	.et-nustiu em { display: block; font-style: normal; font-size: 11px; color: var(--muted); }
+
+	.et-trimite {
+		width: 100%; margin-top: 11px; padding: 13px; border-radius: 13px;
+		font-size: 14px; font-weight: 800; color: #fff; border: 1px solid transparent;
+		background: linear-gradient(100deg, #b45309 0%, #dc2626 55%, #7c3aed 100%);
+		box-shadow: 0 10px 26px -12px rgba(220,38,38,.7);
+		transition: transform .12s ease, opacity .2s ease;
+	}
+	.et-trimite:active { transform: scale(.98); }
+	.et-trimite:disabled { opacity: .55; }
+
+	.et-final-nota {
+		margin: 10px 0 0; font-size: 11.5px; color: var(--muted);
+		border-left: 2px solid #eab308; padding-left: 10px;
+	}
+	.et-final-link {
+		display: inline-block; margin-top: 12px;
+		font-size: 12.5px; font-weight: 700; color: var(--accent); text-decoration: none;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.et.acum .et-inel { animation: none; }
+		.et.gata .et-linie i { transform: scaleY(1); }
+	}
+
 	/* === Heroul atelierului (pasul 1) ===================================== */
 	.ate-hero {
 		position: relative;
