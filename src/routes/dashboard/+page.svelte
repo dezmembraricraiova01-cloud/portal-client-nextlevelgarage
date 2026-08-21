@@ -231,7 +231,7 @@
 
 				{#if m.foto_url}
 					<!-- Banner cu imagine + dock premium -->
-					<div class="relative overflow-hidden hero-banner" style="height: 240px; border-top: 2px solid {cs.text}; --ac: {cs.text};">
+					<div class="relative overflow-hidden hero-banner" style="border-top: 2px solid {cs.text}; --ac: {cs.text};">
 						<img src={m.foto_url} alt="{m.marca} {m.model}"
 							class="absolute inset-0 w-full h-full object-cover kb-img"
 							style="opacity: 0.6; object-position: center 65%;" />
@@ -275,7 +275,7 @@
 					</div>
 				{:else}
 					<!-- Banner showroom (fără poză) — chenarul e butonul de adăugat poză -->
-					<div class="relative overflow-hidden hero-banner" style="height: 240px; border-top: 2px solid {cs.text}; --ac: {cs.text};">
+					<div class="relative overflow-hidden hero-banner" style="border-top: 2px solid {cs.text}; --ac: {cs.text};">
 						{@render showroomBg()}
 
 						<div class="absolute left-0 right-0 top-0 px-5 pt-4 z-10">
@@ -337,7 +337,7 @@
 				<!-- Fallback: nu există WO activ → afișăm mașina principală cu același tratament vizual -->
 				{@const mp = data.masina_principala}
 				{#if mp.foto_url}
-					<div class="relative overflow-hidden hero-banner" style="height: 240px; border-top: 2px solid #22c55e; --ac: #22c55e;">
+					<div class="relative overflow-hidden hero-banner" style="border-top: 2px solid #22c55e; --ac: #22c55e;">
 						<img src={mp.foto_url} alt="{mp.marca} {mp.model}"
 							class="absolute inset-0 w-full h-full object-cover kb-img"
 							style="opacity: 0.6; object-position: center 65%;" />
@@ -367,7 +367,7 @@
 					</div>
 				{:else}
 					<!-- Banner showroom (fără poză) — chenarul e butonul de adăugat poză -->
-					<div class="relative overflow-hidden hero-banner" style="height: 240px; border-top: 2px solid #22c55e; --ac: #22c55e;">
+					<div class="relative overflow-hidden hero-banner" style="border-top: 2px solid #22c55e; --ac: #22c55e;">
 						{@render showroomBg()}
 
 						<div class="absolute left-0 right-0 top-0 px-5 pt-4 z-10">
@@ -404,7 +404,7 @@
 				</div>
 			{:else}
 				<!-- Nicio mașină încă — showroom cu invitație de adăugare -->
-				<div class="relative overflow-hidden hero-banner" style="height: 240px; border-top: 2px solid var(--accent); --ac: #3b82f6;">
+				<div class="relative overflow-hidden hero-banner" style="border-top: 2px solid var(--accent); --ac: #3b82f6;">
 					{@render showroomBg()}
 
 					<div class="absolute left-0 right-0 top-0 px-5 pt-4 z-10">
@@ -528,6 +528,15 @@
 {/if}
 
 <style>
+	/* Înălțimea cardului cu mașina. Era 240px scrisă inline în toate cele cinci
+	   variante de hero (service, service+poză, în regulă ×2, fără mașină), deci
+	   o ajustare însemna cinci modificări care puteau ieși desincronizate.
+	   Acum e într-un singur loc: 360px = 240 + 50%, pe cât de lat e cardul pe
+	   desktop arăta turtit. */
+	.hero-banner {
+		height: 360px;
+	}
+
 	@media (max-width: 480px) {
 		.hero-zone {
 			padding-top: 8px;
