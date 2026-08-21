@@ -169,7 +169,11 @@
 		{ href: '/dashboard/reparatii',   label: 'Reparații',  icon: '🔧' },
 		{ href: '/dashboard/trips',       label: 'Călătorii',  icon: '🗺️' },
 		{ href: '/dashboard/remindere',   label: 'Alerte',     icon: '🔔', badge: true },
-		{ href: '/dashboard/profil',      label: 'Profil',     icon: '👤' },
+		// Profilul stă sus, în header („Profilul meu", lângă nume) — nu-și mai
+		// ocupă un sfert din bara de jos. Locul lui îl ia închirierea, care e
+		// singura acțiune din portal care aduce bani și n-avea decât bannerul
+		// de pe Acasă ca intrare.
+		{ href: '/dashboard/inchirieri',  label: 'Închirieri', icon: '🚙' },
 	];
 
 	const currentPath = $derived(page.url.pathname);
