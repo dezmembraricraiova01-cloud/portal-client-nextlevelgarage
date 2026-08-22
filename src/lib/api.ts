@@ -699,6 +699,12 @@ export interface ProgramariConfig {
 	tipuri_serviciu:   TipServiciu[];
 	cancel_min_hours:  number;
 	max_future_days:   number;
+	/**
+	 * Când îi confirmăm ora, calculat din programul firmei (ca la site) și din
+	 * disponibilitatea consilierului. Lipsește pe un WMS mai vechi — atunci
+	 * etapa 4 spune doar că răspundem, fără termen.
+	 */
+	termen?:           { deschis: boolean; text: string };
 }
 
 export interface ZiBlocata {
