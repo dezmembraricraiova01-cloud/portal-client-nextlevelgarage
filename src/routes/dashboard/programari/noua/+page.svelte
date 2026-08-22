@@ -33,6 +33,12 @@
 	let pas              = $state<1 | 2 | 3>(1);
 	/** Etapa 4: cererea a plecat. Nu mai plecăm din pagină — răspunsul se dă aici. */
 	let trimis           = $state(false);
+	/**
+	 * Când îi confirmăm ora — vine calculat din WMS, din programul firmei (aceeași
+	 * sursă ca la site) și din disponibilitatea consilierului. Nu se compune în
+	 * portal: aici n-avem nici programul, nici cine e azi la birou.
+	 */
+	let termen           = $state<{ deschis: boolean; text: string } | null>(null);
 	let tipSelectat      = $state('');
 	let masinaSelectata  = $state('');
 	let dataSelectata    = $state('');
@@ -184,6 +190,7 @@
 			masini         = cfg.masini;
 			tipuriServiciu = cfg.tipuri_serviciu;
 			maxFutureDays  = cfg.max_future_days;
+			termen         = cfg.termen ?? null;
 			// Pre-selecteaza prima masina daca exista una singura
 			if (masini.length === 1) masinaSelectata = masini[0].numar_inmatriculare;
 
@@ -744,6 +751,12 @@
 							type="button">
 							{saving ? 'Se trimite…' : 'Trimite cererea →'}
 						</button>
+
+						<!-- Termenul se spune ÎNAINTE de apăsare, nu după: omul decide dacă
+						     mai are rost să trimită acum sau sună. -->
+						{#if termen}
+							<p class="et-termen">{termen.text}</p>
+						{/if}
 					</div>
 				{:else if etapaCurenta > 3}
 					<div class="et-rezumat">
@@ -766,7 +779,9 @@
 			<div class="et-corp">
 				{#if trimis}
 					<p class="et-intrebare et-final-mesaj">Gata — am primit cererea.</p>
-					<p class="et-ajutor">Verificăm programul mecanicului și îți confirmăm ora aici, în portal.</p>
+					<p class="et-ajutor">
+						{#if termen}{termen.text}{:else}Îți confirmăm ora aici, în portal.{/if}
+					</p>
 					<p class="et-final-nota">
 						Până atunci programarea scrie <b>„⏳ Planificată"</b> — nu e o eroare, e etapa asta.
 					</p>
@@ -930,6 +945,13 @@
 	}
 	.et-trimite:active { transform: scale(.98); }
 	.et-trimite:disabled { opacity: .55; }
+
+	.et-termen {
+		margin: 9px 0 0;
+		font-size: 12px;
+		text-align: center;
+		color: var(--muted);
+	}
 
 	.et-final-nota {
 		margin: 10px 0 0; font-size: 11.5px; color: var(--muted);
